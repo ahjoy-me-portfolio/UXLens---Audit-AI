@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'ahjoy.me@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email.lower() == 'ahjoy.me@gmail.com';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Rules ---
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins Collection: Used for RBAC
+    // Normally should be locked down, but for initial setup we might need to seed it.
+    // However, the agent instructions say to include the user email from runtime as an admin.
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) &&
+                      incoming().email == request.auth.token.email &&
+                      incoming().keys().hasAll(['fullName', 'email', 'createdAt']);
+      allow update: if isOwner(userId) &&
+                      incoming().email == existing().email && // Email is immutable
+                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'avatarUrl', 'bio', 'jobTitle', 'languagePreference', 'darkMode', 'notifications', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
+    // App Configuration (Public Read, Admin Write)
+    match /appConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Security Configuration (Admin ONLY)
+    match /security/config {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Analysis Reports
+    match /reports/{reportId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+                      incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() &&
+                      existing().userId == request.auth.uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['isFavorite']) &&
+                      incoming().userId == existing().userId; // Protect ownership
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}

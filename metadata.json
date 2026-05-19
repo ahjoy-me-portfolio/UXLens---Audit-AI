@@ -1,0 +1,6 @@
+{
+  "name": "UXLens AI",
+  "description": "AI-powered UI/UX design audit tool for screenshots. Get professional feedback on usability.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

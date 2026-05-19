@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "AppConfig": {
+      "title": "App Configuration",
+      "description": "Global application settings managed by the super admin.",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "logoText": { "type": "string" },
+        "homepage": { "type": "object" },
+        "about": { "type": "object" },
+        "creator": { "type": "object" },
+        "socialLinks": { "type": "object" },
+        "contact": { "type": "object" }
+      }
+    },
+    "SecurityConfig": {
+      "title": "Security Configuration",
+      "description": "Sensitive credentials and AI model parameters.",
+      "type": "object",
+      "properties": {
+        "geminiApiKey": { "type": "string" },
+        "modelName": { "type": "string" },
+        "temperature": { "type": "number" },
+        "maxTokens": { "type": "number" }
+      }
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Detailed profile for each user including subscription and settings.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "subscriptionPlan": { "type": "string" },
+        "languagePreference": { "type": "string" },
+        "darkMode": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "email"]
+    },
+    "AnalysisReport": {
+      "title": "Analysis Report",
+      "description": "A saved UI/UX feedback report.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "imageName": { "type": "string" },
+        "feedback": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isFavorite": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "appConfig/{configId}": {
+      "schema": "AppConfig",
+      "description": "General application settings documents (home, about, ui, etc)."
+    },
+    "security/config": {
+      "schema": "SecurityConfig",
+      "description": "Sensitive configuration for the AI models and API keys."
+    },
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores profile information for all registered users."
+    },
+    "reports/{reportId}": {
+      "schema": "AnalysisReport",
+      "description": "User generated analysis reports."
+    },
+    "admins/{adminId}": {
+      "schema": "object",
+      "description": "A whitelist of user UIDs who have admin access."
+    }
+  }
+}

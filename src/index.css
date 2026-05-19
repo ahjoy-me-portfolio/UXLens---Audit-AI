@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-neutral-50: var(--neutral-50);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-800: var(--neutral-800);
+  --color-neutral-900: var(--neutral-900);
+  --color-neutral-950: var(--neutral-950);
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #0a0a0a;
+    --card: #f5f5f5;
+    --card-foreground: #0a0a0a;
+    --border: #e5e5e5;
+    --neutral-50: #0a0a0a;
+    --neutral-100: #171717;
+    --neutral-200: #262626;
+    --neutral-300: #404040;
+    --neutral-400: #525252;
+    --neutral-500: #737373;
+    --neutral-600: #a3a3a3;
+    --neutral-700: #d4d4d4;
+    --neutral-800: #e5e5e5;
+    --neutral-900: #f5f5f5;
+    --neutral-950: #fafafa;
+  }
+
+  .dark:root, .dark {
+    --background: #0a0a0a;
+    --foreground: #fafafa;
+    --card: #171717;
+    --card-foreground: #fafafa;
+    --border: #262626;
+    --neutral-50: #fafafa;
+    --neutral-100: #f5f5f5;
+    --neutral-200: #e5e5e5;
+    --neutral-300: #d4d4d4;
+    --neutral-400: #a3a3a3;
+    --neutral-500: #737373;
+    --neutral-600: #525252;
+    --neutral-700: #404040;
+    --neutral-800: #262626;
+    --neutral-900: #171717;
+    --neutral-950: #0a0a0a;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply antialiased selection:bg-orange-500 selection:text-white;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  * {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@layer components {
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-neutral-950;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-neutral-800 rounded-full border-2 border-neutral-950 hover:bg-neutral-700 transition-colors;
+  }
+
+  /* Custom Markdown Styles */
+  .markdown-body h1 { 
+    @apply text-3xl font-black mb-6 mt-10 text-orange-600 uppercase italic tracking-tighter border-b border-white/5 pb-4; 
+  }
+  .markdown-body h2 { 
+    @apply text-2xl font-black mb-4 mt-8 uppercase tracking-tight text-white; 
+  }
+  .markdown-body h3 { 
+    @apply text-lg font-bold mb-3 mt-6 text-neutral-300 uppercase tracking-widest; 
+  }
+  .markdown-body p { 
+    @apply text-neutral-400 leading-relaxed mb-6 text-lg; 
+  }
+  .markdown-body ul { 
+    @apply list-none mb-8 space-y-4 text-neutral-400; 
+  }
+  .markdown-body li {
+    @apply relative pl-8 before:content-['→'] before:absolute before:left-0 before:text-orange-500 before:font-bold;
+  }
+  .markdown-body li strong { 
+    @apply text-white font-black uppercase tracking-tight; 
+  }
+  .markdown-body blockquote { 
+    @apply border-l-4 border-orange-600 pl-6 italic text-neutral-500 my-10 bg-orange-600/5 py-6 rounded-r-3xl; 
+  }
+  
+  /* Metric card styling in markdown */
+  .markdown-body li:has(strong) {
+    @apply bg-neutral-900/50 border border-white/5 p-4 rounded-2xl;
+  }
+}
