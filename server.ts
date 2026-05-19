@@ -15,14 +15,44 @@ app.use(express.json({ limit: "50mb" }));
 
 let db: admin.firestore.Firestore | null = null;
 
-// Helper to get fresh security config (Admin SDK bypasses rules)
+// Helper to get fresh security config (Admin SDK bypasses rules) and auto-seed if empty
 async function getSecurityConfig() {
   if (!db) return null;
   try {
-    const d = await db.collection('security').doc('config').get();
-    if (d.exists) return d.data();
+    const docRef = db.collection('security').doc('config');
+    const d = await docRef.get();
+    if (d.exists) {
+      const data = d.data();
+      // If geminiApiKey doesn't exist in Firestore, but is available in the environment, auto-seed it!
+      if (!data?.geminiApiKey && process.env.GEMINI_API_KEY) {
+        console.log("Auto-seeding default GEMINI_API_KEY from server environment into Firestore.");
+        await docRef.set({
+          geminiApiKey: process.env.GEMINI_API_KEY,
+          modelName: data?.modelName || 'gemini-3-flash-preview',
+          temperature: data?.temperature ?? 0.4,
+          maxTokens: data?.maxTokens || 2048,
+          adminPin: data?.adminPin || '1234'
+        }, { merge: true });
+        return {
+          ...data,
+          geminiApiKey: process.env.GEMINI_API_KEY
+        };
+      }
+      return data;
+    } else if (process.env.GEMINI_API_KEY) {
+      console.log("Creating default security config in Firestore with master environment key.");
+      const defaultSec = {
+        geminiApiKey: process.env.GEMINI_API_KEY,
+        modelName: 'gemini-3-flash-preview',
+        temperature: 0.4,
+        maxTokens: 2048,
+        adminPin: '1234'
+      };
+      await docRef.set(defaultSec);
+      return defaultSec;
+    }
   } catch (e) {
-    console.error("Error fetching security config via Admin SDK:", e);
+    console.error("Error fetching/seeding security config via Admin SDK:", e);
   }
   return null;
 }
@@ -44,8 +74,8 @@ app.post("/api/analyze", async (req, res) => {
     try {
       const secConfig = await getSecurityConfig();
       
-      // Priority: Env Var > Firestore Config
-      const apiKey = process.env.GEMINI_API_KEY || (secConfig as any)?.geminiApiKey;
+      // Priority: Firestore Config (Admin custom) > Env Var (Developer built-in)
+      const apiKey = (secConfig as any)?.geminiApiKey || process.env.GEMINI_API_KEY;
       
       if (!apiKey) {
         return res.status(500).json({ error: "GEMINI_API_KEY is missing. Please set it in AI Studio Secrets or Admin Security tab." });
@@ -112,21 +142,53 @@ async function bootstrap() {
   
   try {
     // Load Firebase Config
+    let firebaseConfig: any = null;
     const configPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (fs.existsSync(configPath)) {
-      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      
-      // Initialize Firebase Admin
-      if (!admin.apps.length) {
+      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    } else {
+      // Fallback details to make it 100% portable for Netlify / other cloud targets
+      firebaseConfig = {
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "graphic-antler-g3n78"
+      };
+    }
+    
+    // Initialize Firebase Admin
+    if (!admin.apps.length) {
+      const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (serviceAccountStr) {
+        try {
+          const serviceAccount = JSON.parse(serviceAccountStr);
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            projectId: firebaseConfig.projectId
+          });
+          console.log("Firebase Admin initialized via service account environment variable.");
+        } catch (e) {
+          console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable:", e);
+          admin.initializeApp({
+            projectId: firebaseConfig.projectId,
+          });
+        }
+      } else {
         admin.initializeApp({
           projectId: firebaseConfig.projectId,
         });
+        console.log("Firebase Admin initialized via default ADC or project ID:", firebaseConfig.projectId);
       }
-      db = admin.firestore();
-      console.log("Firebase Admin initialized successfully.");
-    } else {
-      console.warn("firebase-applet-config.json not found, continuing without Firestore config.");
     }
+    db = admin.firestore();
+    console.log("Firebase Firestore database initialized successfully.");
+    
+    // Proactively call getSecurityConfig to check and auto-seed the master API key and default admin settings on boot
+    setTimeout(async () => {
+      try {
+        console.log("Proactively checking / seeding Firestore security config...");
+        await getSecurityConfig();
+      } catch (e) {
+        console.error("Proactive seeding failed:", e);
+      }
+    }, 1000);
   } catch (err) {
     console.error("Failed to initialize Firebase Admin:", err);
   }

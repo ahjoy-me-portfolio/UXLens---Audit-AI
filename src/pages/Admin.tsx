@@ -193,7 +193,17 @@ export function Admin() {
     if (!localConfig) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'appConfig', 'main'), localConfig);
+      const isCreatorSuperAdmin = user?.email?.toLowerCase() === 'ahjoy.me@gmail.com';
+      const finalConfig = { ...localConfig };
+      if (!isCreatorSuperAdmin) {
+        // Enforce fallback lock on creator profile database entries so other admins can't corrupt it
+        finalConfig.creator = {
+          name: "AH JOY",
+          portfolio: "https://ahjoy.framer.website/",
+          avatarUrl: "/input_file_2.png"
+        };
+      }
+      await setDoc(doc(db, 'appConfig', 'main'), finalConfig);
       setMessage({ t: 's', m: 'Content updated successfully!' });
     } catch (e: any) {
       setMessage({ t: 'e', m: e.message });
@@ -370,12 +380,27 @@ export function Admin() {
 
             {/* Creator Section */}
             <div className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 sm:p-10 space-y-8 overflow-hidden">
-              <div className="flex items-center gap-4 border-b border-neutral-800 pb-4">
-                 <div className="w-10 h-10 rounded-xl bg-orange-600/20 flex items-center justify-center">
-                    <User className="w-5 h-5 text-orange-600" />
-                 </div>
-                 <h3 className="text-xl font-black text-white">Creator Profile (Personalize)</h3>
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
+                <div className="flex items-center gap-4">
+                   <div className="w-10 h-10 rounded-xl bg-orange-600/20 flex items-center justify-center">
+                      <User className="w-5 h-5 text-orange-600" />
+                   </div>
+                   <h3 className="text-xl font-black text-white">Creator Profile (Personalize)</h3>
+                </div>
+                {user?.email?.toLowerCase() === 'ahjoy.me@gmail.com' ? (
+                  <span className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[10px] font-black uppercase">Owner access authorized</span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Immutable Profile
+                  </span>
+                )}
               </div>
+              
+              {user?.email?.toLowerCase() !== 'ahjoy.me@gmail.com' && (
+                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 text-xs text-amber-400">
+                  This creator profile is pinned to the original creator (<strong>AH JOY</strong>). Only super admins can update creator information.
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="space-y-6">
@@ -384,8 +409,9 @@ export function Admin() {
                     <input 
                       type="text" 
                       value={localConfig.creator?.name}
+                      disabled={user?.email?.toLowerCase() !== 'ahjoy.me@gmail.com'}
                       onChange={(e) => setLocalConfig({...localConfig, creator: {...localConfig.creator!, name: e.target.value}})}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white disabled:opacity-50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -394,8 +420,9 @@ export function Admin() {
                       <input 
                         type="text" 
                         value={localConfig.creator?.portfolio}
+                        disabled={user?.email?.toLowerCase() !== 'ahjoy.me@gmail.com'}
                         onChange={(e) => setLocalConfig({...localConfig, creator: {...localConfig.creator!, portfolio: e.target.value}})}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 pr-12 outline-none focus:ring-1 focus:ring-orange-600 text-white"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 pr-12 outline-none focus:ring-1 focus:ring-orange-600 text-white disabled:opacity-50"
                       />
                       <ExternalLink className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
                     </div>
@@ -409,22 +436,30 @@ export function Admin() {
                       {localConfig.creator?.avatarUrl ? (
                          <>
                            <img src={localConfig.creator.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
-                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <ImageIcon className="w-8 h-8 text-white" />
-                           </div>
+                           {user?.email?.toLowerCase() === 'ahjoy.me@gmail.com' && (
+                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <ImageIcon className="w-8 h-8 text-white animate-bounce" />
+                             </div>
+                           )}
                          </>
                       ) : (
-                        <User className="w-12 h-12 text-neutral-700" />
+                         <User className="w-12 h-12 text-neutral-700" />
                       )}
                     </div>
                     
                     <div className="flex flex-col gap-2 w-full">
-                       <label className="w-full h-12 bg-neutral-800 hover:bg-neutral-700 text-white font-black rounded-xl flex items-center justify-center gap-3 cursor-pointer transition-all active:scale-95">
-                          <Upload className="w-4 h-4" />
-                          Upload from Device
-                          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                       </label>
-                       <p className="text-[10px] text-neutral-600 text-center">Image is stored securely in your private cloud config.</p>
+                       {user?.email?.toLowerCase() === 'ahjoy.me@gmail.com' ? (
+                         <>
+                           <label className="w-full h-12 bg-neutral-800 hover:bg-neutral-700 text-white font-black rounded-xl flex items-center justify-center gap-3 cursor-pointer transition-all active:scale-95">
+                              <Upload className="w-4 h-4" />
+                              Upload from Device
+                              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                           </label>
+                           <p className="text-[10px] text-neutral-600 text-center">Image is stored securely in your private cloud config.</p>
+                         </>
+                       ) : (
+                         <p className="text-xs text-neutral-500 text-center py-2 font-bold bg-neutral-900 rounded-xl border border-neutral-800">Photo modification locked.</p>
+                       )}
                     </div>
                   </div>
                 </div>

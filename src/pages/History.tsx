@@ -43,29 +43,41 @@ export function History() {
       exportContainer.style.width = '800px';
       exportContainer.style.backgroundColor = '#ffffff';
       exportContainer.style.color = '#1a1a1a';
-      exportContainer.style.fontFamily = '"Inter", "Segoe UI", Roboto, sans-serif';
+      exportContainer.style.fontFamily = language === 'bn'
+        ? '"Hind Siliguri", "Noto Sans Bengali", "Inter", "Segoe UI", sans-serif'
+        : '"Inter", "Segoe UI", Roboto, sans-serif';
+      exportContainer.style.fontVariantLigatures = 'common-ligatures';
+      exportContainer.style.fontFeatureSettings = '"liga" 1, "clig" 1';
       
       const result = getParsedResult(report);
       const rawContent = language === 'en' ? result.en : result.bn;
       
       // Clean up markdown for display
       const formattedContent = rawContent
-        .replace(/### (.*)/g, '<h3 style="color: #ea580c; font-size: 18px; margin-top: 25px; margin-bottom: 10px; font-weight: 800; border-bottom: 1px solid #f3f4f6; pb-2;">$1</h3>')
-        .replace(/## (.*)/g, '<h2 style="color: #111827; font-size: 22px; margin-top: 30px; margin-bottom: 15px; font-weight: 900;">$1</h2>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong style="color: #111827;">$1</strong>')
-        .replace(/^- (.*)/gm, '<li style="margin-bottom: 8px; padding-left: 5px;">$1</li>')
-        .split('\n\n').map(p => p.trim().startsWith('<h') || p.trim().startsWith('<li') ? p : `<p style="margin-bottom: 15px; line-height: 1.6;">${p}</p>`).join('');
+        .replace(/### (.*)/g, language === 'bn' 
+          ? '<h3 style="color: #ea580c; font-size: 19px; margin-top: 25px; margin-bottom: 10px; font-weight: 800; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; font-family: \'Hind Siliguri\', sans-serif;">$1</h3>'
+          : '<h3 style="color: #ea580c; font-size: 18px; margin-top: 25px; margin-bottom: 10px; font-weight: 800; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px;">$1</h3>')
+        .replace(/## (.*)/g, language === 'bn'
+          ? '<h2 style="color: #111827; font-size: 23px; margin-top: 30px; margin-bottom: 15px; font-weight: 900; font-family: \'Hind Siliguri\', sans-serif;">$1</h2>'
+          : '<h2 style="color: #111827; font-size: 22px; margin-top: 30px; margin-bottom: 15px; font-weight: 900;">$1</h2>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong style="color: #111827; font-weight: 800;">$1</strong>')
+        .replace(/^- (.*)/gm, `<li style="margin-bottom: 10px; padding-left: 5px; line-height: 1.8; ${language === 'bn' ? 'font-family: \'Hind Siliguri\', sans-serif;' : ''}">$1</li>`)
+        .split('\n\n').map(p => {
+          const trimmed = p.trim();
+          if (trimmed.startsWith('<h') || trimmed.startsWith('<li')) return trimmed;
+          return `<p style="margin-bottom: 18px; line-height: 1.8; ${language === 'bn' ? 'font-family: \'Hind Siliguri\', sans-serif; font-size: 16px; word-break: keep-all;' : 'font-size: 15px;'}">${trimmed}</p>`;
+        }).join('');
 
       exportContainer.innerHTML = `
         <!-- Header -->
-        <div style="background: #0a0a0a; padding: 40px; color: white;">
+        <div style="background: #0a0a0a; padding: 40px; color: white; ${language === 'bn' ? "font-family: 'Hind Siliguri', sans-serif;" : ''}">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
             <div>
               <h1 style="font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -0.02em;">UXLens <span style="color: #ea580c;">AI</span></h1>
-              <p style="color: #9ca3af; margin: 5px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em;">Professional UI/UX Audit Report</p>
+              <p style="color: #9ca3af; margin: 5px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; ${language === 'bn' ? 'font-family: \'Hind Siliguri\', sans-serif;' : ''}">${language === 'en' ? 'Professional UI/UX Audit Report' : 'পেশাদার ইউআই/ইউএক্স অডিট রিপোর্ট'}</p>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 12px; color: #9ca3af;">REPORT ID</div>
+              <div style="font-size: 12px; color: #9ca3af;">${language === 'en' ? 'REPORT ID' : 'রিপোর্ট নম্বর'}</div>
               <div style="font-size: 14px; font-weight: 700; font-family: monospace; color: #ea580c;">#${report.id.slice(0, 8).toUpperCase()}</div>
             </div>
           </div>
@@ -73,15 +85,15 @@ export function History() {
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
              <div style="display: flex; flex-direction: column; justify-content: center;">
                 <div style="margin-bottom: 20px;">
-                  <label style="font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase;">Design Name</label>
+                  <label style="font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; ${language === 'bn' ? 'font-family: \'Hind Siliguri\', sans-serif;' : ''}">${language === 'en' ? 'Design Name' : 'ডিজাইনের নাম'}</label>
                   <div style="font-size: 20px; font-weight: 700;">${report.imageName}</div>
                 </div>
                 <div style="margin-bottom: 20px;">
-                  <label style="font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase;">Design Category</label>
+                  <label style="font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; ${language === 'bn' ? 'font-family: \'Hind Siliguri\', sans-serif;' : ''}">${language === 'en' ? 'Design Category' : 'ডিজাইনের বিভাগ'}</label>
                   <div style="font-size: 16px; font-weight: 600; color: #d1d5db;">${report.designType}</div>
                 </div>
                 <div>
-                  <label style="font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase;">Audit Date</label>
+                   <label style="font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; ${language === 'bn' ? 'font-family: \'Hind Siliguri\', sans-serif;' : ''}">${language === 'en' ? 'Audit Date' : 'অডিটের তারিখ'}</label>
                   <div style="font-size: 14px; color: #9ca3af;">${formatDate(report.createdAt)}</div>
                 </div>
              </div>
@@ -92,24 +104,24 @@ export function History() {
         </div>
 
         <!-- Content -->
-        <div style="padding: 60px 50px;">
+        <div style="padding: 60px 50px; ${language === 'bn' ? "font-family: 'Hind Siliguri', sans-serif;" : ''}">
           <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 40px; background: #fff7ed; padding: 20px; border-left: 4px solid #ea580c; border-radius: 0 12px 12px 0;">
             <div style="font-size: 24px;">🎯</div>
-            <div>
-              <h4 style="margin: 0; font-size: 16px; font-weight: 800; color: #7c2d12;">Expert Insight Overview</h4>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #9a3412;">An analysis of your design's usability, accessibility, and visual hierarchy.</p>
+            <div style="${language === 'bn' ? "font-family: 'Hind Siliguri', sans-serif;" : ''}">
+              <h4 style="margin: 0; font-size: 16px; font-weight: 800; color: #7c2d12;">${language === 'en' ? 'Expert Insight Overview' : 'বিশেষজ্ঞ পর্যবেক্ষণ বিবরণ'}</h4>
+              <p style="margin: 2px 0 0 0; font-size: 13px; color: #9a3412;">${language === 'en' ? "An analysis of your design's usability, accessibility, and visual hierarchy." : "ডিজাইনের কার্যকারিতা, অ্যাক্সেসিবিলিটি এবং ভিজ্যুয়াল হায়ারার্কির বিস্তারিত বিশ্লেষণ।"}</p>
             </div>
           </div>
 
-          <div style="font-size: 15px; color: #374151;">
+          <div style="font-size: 15px; color: #374151; font-variant-ligatures: common-ligatures; font-feature-settings: 'liga' 1, 'clig' 1; word-break: keep-all; line-height: 1.8;">
             ${formattedContent}
           </div>
         </div>
 
         <!-- Footer -->
-        <div style="margin-top: 50px; padding: 40px; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+        <div style="margin-top: 50px; padding: 40px; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; ${language === 'bn' ? "font-family: 'Hind Siliguri', sans-serif;" : ''}">
           <div style="font-size: 12px; color: #6b7280;">
-            &copy; ${new Date().getFullYear()} UXLens AI. Generated for <strong>${user?.email}</strong>.
+            &copy; ${new Date().getFullYear()} UXLens AI. ${language === 'en' ? `Generated for <strong>${user?.email}</strong>.` : `<strong>${user?.email}</strong> এর জন্য তৈরি করা হয়েছে।`}
           </div>
           <div style="font-size: 12px; font-weight: 700; color: #ea580c;">
              EXPERIENCE DRIVEN AUDIT
