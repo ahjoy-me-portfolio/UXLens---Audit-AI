@@ -13,7 +13,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
-import { db, signInWithGoogle } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { triggerAuthModal } from '../components/AuthModal';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { compressImage } from '../lib/image';
 
@@ -73,7 +74,20 @@ export function Home() {
     setResult(null);
 
     try {
-      const response = await fetch('/api/analyze', {
+      // Determine backend URL dynamically based on environment (with support for WebView/APK environments)
+      let apiEndpoint = '/api/analyze';
+      const isMobileApp = !window.location.origin.startsWith('http') || window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+      if (isMobileApp && config?.serverUrl) {
+        const base = config.serverUrl.replace(/\/$/, "");
+        apiEndpoint = `${base}/api/analyze`;
+      } else if (isMobileApp) {
+        // Safe, emergency fallback to the sandbox production deployment endpoint
+        apiEndpoint = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+      }
+
+      console.log(`Connecting to analysis endpoint: ${apiEndpoint}`);
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image, designType, goal }),
@@ -233,7 +247,7 @@ console.log("Analysis successful, preparing to save to history...");
               <div className="p-4 rounded-2xl bg-orange-600/5 border border-orange-600/10 flex items-start gap-4">
                 <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-neutral-400">
-                  <button onClick={signInWithGoogle} className="text-orange-500 font-bold hover:underline">Sign in</button> to save this analysis to your history and favorites.
+                  <button onClick={triggerAuthModal} className="text-orange-500 font-bold hover:underline">Sign in</button> to save this analysis to your history and favorites.
                 </p>
               </div>
             )}

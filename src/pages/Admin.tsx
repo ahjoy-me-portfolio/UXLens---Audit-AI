@@ -310,6 +310,17 @@ export function Admin() {
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white"
                   />
                 </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest px-1">Backend Production Server URL (For APK/Mobile Compatibility)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. https://uxlens-ai.netlify.app"
+                    value={localConfig.serverUrl || ''}
+                    onChange={(e) => setLocalConfig({...localConfig, serverUrl: e.target.value})}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white"
+                  />
+                  <p className="text-xs text-neutral-500 px-1 mt-1">When running as a mobile APK, the app uses this backend URL to process screenshot audits. Standard web deployments will automatically detect this.</p>
+                </div>
               </div>
             </div>
 

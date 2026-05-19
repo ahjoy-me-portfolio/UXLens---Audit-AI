@@ -7,6 +7,7 @@ export interface AppConfig {
   tagline: string;
   logoUrl?: string;
   logoText?: string;
+  serverUrl?: string;
   homepage?: {
     heroTitle?: string;
     heroSubtitle?: string;
@@ -33,6 +34,7 @@ const DEFAULT_CONFIG: AppConfig = {
   appName: "UXLens AI",
   tagline: "Upload any design. Get instant professional UI/UX feedback.",
   logoText: "UXLens",
+  serverUrl: "",
   homepage: {
     heroTitle: "Expert UI/UX Feedback in Seconds",
     heroSubtitle: "Analyze your designs with the power of world-class creative directors.",

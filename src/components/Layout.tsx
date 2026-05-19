@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Scan, 
@@ -15,14 +15,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
 import { logout } from '../lib/firebase';
+import { AuthModal, triggerAuthModal } from './AuthModal';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, isAdmin, t } = useAuth();
   const { config } = useConfig();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const [logoTaps, setLogoTaps] = useState(0);
+
+  useEffect(() => {
+    const handleOpenAuth = () => setIsAuthOpen(true);
+    window.addEventListener('open-auth-modal', handleOpenAuth);
+    return () => window.removeEventListener('open-auth-modal', handleOpenAuth);
+  }, []);
 
   const handleLogoClick = () => {
     if (!isAdmin) return;
@@ -80,13 +88,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               )
             ))}
-            {user && (
+            {user ? (
               <button
                 onClick={handleLogout}
                 className="ml-2 p-2 rounded-full text-neutral-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsAuthOpen(true)}
+                className="ml-2 px-4 py-2 rounded-full bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold shadow-lg shadow-orange-600/20 transition-all active:scale-[0.98]"
+              >
+                Sign In
               </button>
             )}
           </nav>
@@ -128,13 +143,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 )
               ))}
-              {user && (
+              {user ? (
                 <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-4 p-4 rounded-2xl text-lg font-medium text-red-500 hover:bg-red-500/10 mt-4"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex items-center gap-4 p-4 rounded-2xl text-lg font-medium text-red-500 hover:bg-red-500/10 mt-4 animate-colors"
                 >
                   <LogOut className="w-6 h-6" />
                   {t('logout')}
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setIsAuthOpen(true);
+                  }}
+                  className="flex items-center gap-4 p-4 rounded-2xl text-lg font-bold text-orange-500 bg-orange-500/5 hover:bg-orange-500/10 mt-4 border border-orange-500/10"
+                >
+                  <User className="w-6 h-6" />
+                  Sign In / Register
                 </button>
               )}
             </nav>
@@ -146,6 +175,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {children}
       </main>
+
+      {/* Custom Auth Modal state wrapper toggle */}
+      <AnimatePresence>
+        {isAuthOpen && (
+          <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="border-t border-neutral-900 bg-neutral-950 py-12 mt-auto">
