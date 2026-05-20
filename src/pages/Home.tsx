@@ -74,40 +74,62 @@ export function Home() {
     setResult(null);
 
     try {
-      // Determine backend URL dynamically based on environment (with support for WebView/APK environments and Netlify static hosting)
-      let apiEndpoint = '/api/analyze';
+      // Determine candidate backend URLs dynamically based on environment to support Netlify, static hosts, and mobile WebView/APKs
+      let endpoints: string[] = ['/api/analyze'];
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const isCloudRun = window.location.hostname.includes('asia-east1.run.app') || window.location.hostname.includes('run.app');
       const isWebView = !window.location.origin.startsWith('http');
 
-      const cloudRunFallback = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+      const devCloudRun = 'https://ais-dev-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+      const preCloudRun = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
 
       if (isWebView || (!isLocalhost && !isCloudRun)) {
+        // If we are on Netlify or an external static host, relative api path won't work, so we try Cloud Run containers
+        endpoints = [];
         if (config?.serverUrl && config.serverUrl.trim() !== "") {
           const base = config.serverUrl.trim().replace(/\/$/, "");
-          
-          // If the configured URL is a Netlify URL, or points directly to the current static site hostname,
-          // then Netlify is not actually hosting the Node.js backend server. So we bypass it and use the real Cloud Run fallback.
-          const isInvalidBackend = base.includes("netlify.app") || base.includes(window.location.hostname);
-          
-          if (isInvalidBackend) {
-            apiEndpoint = cloudRunFallback;
-          } else {
-            apiEndpoint = `${base}/api/analyze`;
+          const isInvalid = base.includes("netlify.app") || base.includes(window.location.hostname);
+          if (!isInvalid) {
+            endpoints.push(`${base}/api/analyze`);
           }
-        } else {
-          // Use the Cloud Run live backend when hosted on static platforms like Netlify
-          apiEndpoint = cloudRunFallback;
+        }
+        endpoints.push(devCloudRun);
+        endpoints.push(preCloudRun);
+      } else {
+        // On local or Cloud Run, relative endpoint is preferred, backed up by absolute URLs
+        endpoints.push(devCloudRun);
+        endpoints.push(preCloudRun);
+      }
+
+      console.log('Target endpoints to probe:', endpoints);
+
+      let lastError: any = null;
+      let response: Response | null = null;
+      let activeEndpointUsed = '';
+
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Connecting to analysis endpoint: ${endpoint}`);
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image, designType, goal }),
+          });
+          response = res;
+          activeEndpointUsed = endpoint;
+          break; // Succeeded (did not throw network exception), so break loop
+        } catch (fetchErr: any) {
+          console.warn(`Fetch attempt failed for ${endpoint}:`, fetchErr);
+          lastError = fetchErr;
         }
       }
 
-      console.log(`Connecting to analysis endpoint: ${apiEndpoint}`);
-
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, designType, goal }),
-      });
+      if (!response) {
+        throw new Error(
+          lastError?.message || 
+          "Failed to establish secure connection to any UX audit cloud server fallback. Please verify your network connection."
+        );
+      }
 
       const data = await response.json();
 
