@@ -38,6 +38,16 @@ export function Profile() {
   const [editValue, setEditValue] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const handleLogout = async () => {
+    if (user?.uid.startsWith('local_')) {
+      localStorage.removeItem('local_auth_user');
+      localStorage.removeItem('local_user_profile');
+      window.dispatchEvent(new Event('local-logout'));
+    } else {
+      await logout();
+    }
+  };
+
   useEffect(() => {
     if (globalProfile) {
       setProfile(globalProfile);
@@ -49,11 +59,21 @@ export function Profile() {
     if (!user) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        ...updates,
-        updatedAt: serverTimestamp()
-      });
-      setProfile(prev => prev ? { ...prev, ...updates } : null);
+      if (user.uid.startsWith('local_')) {
+        const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
+        const updated = { ...cachedProfile, ...updates };
+        localStorage.setItem('local_user_profile', JSON.stringify(updated));
+        
+        // Dispatch event to synchronize useAuth hook
+        window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: updated }));
+        setProfile(prev => prev ? { ...prev, ...updates } : null);
+      } else {
+        await updateDoc(doc(db, 'users', user.uid), {
+          ...updates,
+          updatedAt: serverTimestamp()
+        });
+        setProfile(prev => prev ? { ...prev, ...updates } : null);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -329,7 +349,7 @@ export function Profile() {
           
           <div className="space-y-4">
              <button
-              onClick={() => logout()}
+              onClick={() => handleLogout()}
               className="w-full flex items-center justify-between gap-4 p-4 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition-all group"
              >
                <span className="text-sm font-bold">Log out from device</span>

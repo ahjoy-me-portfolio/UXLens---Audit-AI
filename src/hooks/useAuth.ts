@@ -14,11 +14,60 @@ export function useAuth() {
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
 
+    const handleLocalState = () => {
+      const savedUser = localStorage.getItem('local_auth_user');
+      const savedProfile = localStorage.getItem('local_user_profile');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+        if (savedProfile) {
+          setProfile(JSON.parse(savedProfile));
+        } else {
+          setProfile({
+            fullName: 'Guest Designer',
+            email: 'guest@uxlens.local',
+            role: 'user',
+            createdAt: new Date().toISOString(),
+            languagePreference: 'en',
+            darkMode: true,
+            notifications: true
+          });
+        }
+        setIsAdmin(false);
+        setLoading(false);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+        setLoading(false);
+      }
+    };
+
+    // Event listeners to dynamically update the React tree when logging in/out locally
+    window.addEventListener('local-login', handleLocalState);
+    window.addEventListener('local-logout', handleLocalState);
+
+    const handleProfileUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setProfile(customEvent.detail);
+      }
+    };
+    window.addEventListener('local-profile-updated', handleProfileUpdate);
+
+    // If there is an active local session on boot, prioritize it
+    const hasLocalUser = localStorage.getItem('local_auth_user');
+    if (hasLocalUser) {
+      handleLocalState();
+    }
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
       try {
-        setUser(u);
         if (u) {
-          // Admin check logic...
+          // A real Firebase user logged in -> Clear any local auth sandbox keys to prevent collision
+          localStorage.removeItem('local_auth_user');
+          localStorage.removeItem('local_user_profile');
+
+          setUser(u);
           const isSuperAdmin = u.email?.toLowerCase() === 'ahjoy.me@gmail.com';
           let isAdminUser = isSuperAdmin;
           
@@ -32,15 +81,17 @@ export function useAuth() {
                 isSuper: true 
               });
             }
-          } catch (e) { console.warn('Admin check failed'); }
+          } catch (e) {
+            console.warn('Admin check failed:', e);
+          }
           
           setIsAdmin(isAdminUser);
 
-          // Setup profile listener
+          // Setup profile Listener
           const userRef = doc(db, 'users', u.uid);
-          unsubscribeProfile = onSnapshot(userRef, (doc) => {
-            if (doc.exists()) {
-              setProfile(doc.data() as UserProfile);
+          unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+              setProfile(docSnap.data() as UserProfile);
             } else {
               // Seed if missing
               setDoc(userRef, {
@@ -54,22 +105,36 @@ export function useAuth() {
                 notifications: true
               });
             }
+          }, (err) => {
+            console.warn("Firestore profile snapshot permission error, ignoring:", err);
           });
         } else {
-          setIsAdmin(false);
-          setProfile(null);
-          if (unsubscribeProfile) unsubscribeProfile();
+          // If no Firebase user and no active local session, reset state
+          if (!localStorage.getItem('local_auth_user')) {
+            setUser(null);
+            setProfile(null);
+            setIsAdmin(false);
+          }
+          if (unsubscribeProfile) {
+            unsubscribeProfile();
+            unsubscribeProfile = null;
+          }
         }
       } catch (e) {
         console.error('Auth check error:', e);
       } finally {
-        setLoading(false);
+        if (!localStorage.getItem('local_auth_user')) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
+      window.removeEventListener('local-login', handleLocalState);
+      window.removeEventListener('local-logout', handleLocalState);
+      window.removeEventListener('local-profile-updated', handleProfileUpdate);
     };
   }, []);
 

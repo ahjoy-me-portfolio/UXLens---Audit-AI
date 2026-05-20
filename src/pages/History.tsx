@@ -187,6 +187,17 @@ export function History() {
       return;
     }
 
+    if (user.uid.startsWith('local_')) {
+      try {
+        const localSaved = JSON.parse(localStorage.getItem('local_reports') || '[]');
+        setReports(localSaved);
+      } catch (e) {
+        console.error("Failed to load local reports:", e);
+      }
+      setLoading(false);
+      return;
+    }
+
     const q = query(
       collection(db, 'reports'),
       where('userId', '==', user.uid),
@@ -200,6 +211,14 @@ export function History() {
       })) as AnalysisReport[];
       setReports(data);
       setLoading(false);
+    }, (err) => {
+      console.warn("Firestore snapshot loading error:", err);
+      // Fail down safely to local storage behavior for users in case of Firestore rules mismatches
+      try {
+        const localSaved = JSON.parse(localStorage.getItem('local_reports') || '[]');
+        setReports(localSaved);
+      } catch (e) {}
+      setLoading(false);
     });
 
     return unsubscribe;
@@ -207,6 +226,23 @@ export function History() {
 
   const toggleFavorite = async (e: React.MouseEvent, report: AnalysisReport) => {
     e.stopPropagation();
+    if (user?.uid.startsWith('local_')) {
+      try {
+        const localSaved = JSON.parse(localStorage.getItem('local_reports') || '[]');
+        const updated = localSaved.map((r: any) => {
+          if (r.id === report.id) return { ...r, isFavorite: !r.isFavorite };
+          return r;
+        });
+        localStorage.setItem('local_reports', JSON.stringify(updated));
+        setReports(updated);
+        if (selectedReport?.id === report.id) {
+          setSelectedReport({ ...selectedReport, isFavorite: !selectedReport.isFavorite });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
     const docRef = doc(db, 'reports', report.id);
     await updateDoc(docRef, { isFavorite: !report.isFavorite });
   };
@@ -214,6 +250,18 @@ export function History() {
   const deleteReport = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm("Are you sure you want to delete this report?")) {
+      if (user?.uid.startsWith('local_')) {
+        try {
+          const localSaved = JSON.parse(localStorage.getItem('local_reports') || '[]');
+          const updated = localSaved.filter((r: any) => r.id !== id);
+          localStorage.setItem('local_reports', JSON.stringify(updated));
+          setReports(updated);
+          if (selectedReport?.id === id) setSelectedReport(null);
+        } catch (err) {
+          console.error(err);
+        }
+        return;
+      }
       await deleteDoc(doc(db, 'reports', id));
       if (selectedReport?.id === id) setSelectedReport(null);
     }

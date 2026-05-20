@@ -93,14 +93,44 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     } catch (err: any) {
       console.error(err);
       let errMsg = "An unexpected error occurred.";
+      const isConfigError = err.code === 'auth/operation-not-allowed' || 
+                           err.message?.includes('operation-not-allowed') || 
+                           err.code === 'auth/admin-restricted-operation' || 
+                           err.message?.includes('admin-restricted-operation');
+
+      if (isConfigError) {
+        // Automatically start sandbox mode so they are in no way blocked
+        localStorage.setItem('local_auth_user', JSON.stringify({
+          uid: 'local_user_' + Math.random().toString(36).substr(2, 9),
+          email: email || 'local@uxlens.local',
+          displayName: fullName || 'Local Designer',
+          photoURL: '',
+          isAnonymous: false
+        }));
+        localStorage.setItem('local_user_profile', JSON.stringify({
+          fullName: fullName || 'Local Designer',
+          email: email || 'local@uxlens.local',
+          role: 'user',
+          createdAt: new Date().toISOString(),
+          languagePreference: 'en',
+          darkMode: true,
+          notifications: true
+        }));
+        
+        setSuccess("🔒 Firebase Auth configuration is missing. Starting local Sandbox Mode so you can use UXLens without account limits!");
+        window.dispatchEvent(new Event('local-login'));
+        setTimeout(() => {
+          onClose();
+        }, 2500);
+        return;
+      }
+
       if (err.code === 'auth/email-already-in-use') {
         errMsg = "This email is already registered. Please sign in instead.";
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
         errMsg = "Invalid email or password. Please verify your credentials.";
       } else if (err.code === 'auth/invalid-email') {
         errMsg = "The email address formatting is invalid.";
-      } else if (err.code === 'auth/admin-restricted-operation' || err.message?.includes('admin-restricted-operation')) {
-        errMsg = "🔒 Sign-In is disabled. Please go to your Firebase Console -> Build -> Authentication -> Sign-in Method tab and enable 'Email/Password' and 'Anonymous' logins so users can register and run audits. (ফায়ারবেস কনসোলে Email/Password এবং Anonymous লগইন চালু করুন)";
       } else {
         errMsg = err.message || errMsg;
       }
@@ -121,6 +151,31 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       }, 1000);
     } catch (err: any) {
       console.error(err);
+      const isConfigError = err.code === 'auth/operation-not-allowed' || err.message?.includes('operation-not-allowed');
+      if (isConfigError) {
+        localStorage.setItem('local_auth_user', JSON.stringify({
+          uid: 'local_user_' + Math.random().toString(36).substr(2, 9),
+          email: 'google@uxlens.local',
+          displayName: 'Google Partner',
+          photoURL: '',
+          isAnonymous: false
+        }));
+        localStorage.setItem('local_user_profile', JSON.stringify({
+          fullName: 'Google Partner',
+          email: 'google@uxlens.local',
+          role: 'user',
+          createdAt: new Date().toISOString(),
+          languagePreference: 'en',
+          darkMode: true,
+          notifications: true
+        }));
+        setSuccess("Google Sign-In is not enabled on Firebase. Starting Local Sandbox session!");
+        window.dispatchEvent(new Event('local-login'));
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+        return;
+      }
       setError(
         isMobileWebView 
           ? "Google Popup is blocked inside APK WebView. Please use standard Email/Password Sign-In."
@@ -141,8 +196,29 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         onClose();
       }, 1000);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Guest Login failed.");
+      console.warn("Firebase Guest auth failed, falling back to local guest user:", err);
+      localStorage.setItem('local_auth_user', JSON.stringify({
+        uid: 'local_guest_' + Math.random().toString(36).substr(2, 9),
+        email: 'guest@uxlens.local',
+        displayName: 'Guest Designer',
+        photoURL: '',
+        isAnonymous: true
+      }));
+      localStorage.setItem('local_user_profile', JSON.stringify({
+        fullName: 'Guest Designer',
+        email: 'guest@uxlens.local',
+        role: 'user',
+        createdAt: new Date().toISOString(),
+        languagePreference: 'en',
+        darkMode: true,
+        notifications: true
+      }));
+      
+      setSuccess("Local Guest Sandbox Session Enabled! Redirecting...");
+      window.dispatchEvent(new Event('local-login'));
+      setTimeout(() => {
+        onClose();
+      }, 1500);
     } finally {
       setLoading(false);
     }

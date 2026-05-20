@@ -20,6 +20,7 @@ export interface UserProfile {
   bio?: string;
   jobTitle?: string;
   notifications?: boolean;
+  createdAt?: any;
 }
 
 export interface SecurityConfig {

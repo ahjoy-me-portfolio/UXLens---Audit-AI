@@ -62,7 +62,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.remove('dark');
     }
     
-    if (user && db) {
+    if (user && db && !user.uid.startsWith('local_')) {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
           darkMode: nextDark
@@ -72,6 +72,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       }
     } else {
       localStorage.setItem('darkMode', String(nextDark));
+      if (user?.uid.startsWith('local_')) {
+        const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
+        const updated = { ...cachedProfile, darkMode: nextDark };
+        localStorage.setItem('local_user_profile', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: updated }));
+      }
     }
   };
 
@@ -99,7 +105,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   ];
 
   const handleLogout = async () => {
-    await logout();
+    if (user?.uid.startsWith('local_')) {
+      localStorage.removeItem('local_auth_user');
+      localStorage.removeItem('local_user_profile');
+      window.dispatchEvent(new Event('local-logout'));
+    } else {
+      await logout();
+    }
     navigate('/');
   };
 

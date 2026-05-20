@@ -106,7 +106,7 @@ export function Home() {
       }
 
       setResult(data.result);
-console.log("Analysis successful, preparing to save to history...");
+      console.log("Analysis successful, preparing to save to history...");
 
       // Save to history if logged in
       if (user) {
@@ -114,19 +114,34 @@ console.log("Analysis successful, preparing to save to history...");
           // Compress image for storage to stay under 1MB limit
           // We target a conservative size for storage
           const storageImage = await compressImage(image, 1000, 1000, 0.6);
-          
-          await addDoc(collection(db, 'reports'), {
+          const newReport = {
             userId: user.uid,
             imageUrl: storageImage,
             imageName: `Analysis - ${new Date().toLocaleDateString()}`,
             feedback: data.result,
-            createdAt: serverTimestamp(),
             isFavorite: false,
             designType
-          });
-          console.log("Report saved to history successfully.");
+          };
+
+          if (user.uid.startsWith('local_')) {
+            const localSaved = JSON.parse(localStorage.getItem('local_reports') || '[]');
+            const localReport = {
+              id: 'local_rep_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+              ...newReport,
+              createdAt: new Date().toISOString()
+            };
+            localSaved.unshift(localReport);
+            localStorage.setItem('local_reports', JSON.stringify(localSaved));
+            console.log("Report saved to local storage successfully.");
+          } else {
+            await addDoc(collection(db, 'reports'), {
+              ...newReport,
+              createdAt: serverTimestamp()
+            });
+            console.log("Report saved to Cloud Firestore successfully.");
+          }
         } catch (saveErr) {
-          console.error("Failed to save report to history:", saveErr);
+          console.error("Failed to save report:", saveErr);
         }
       }
     } catch (err: any) {
