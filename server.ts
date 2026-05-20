@@ -148,18 +148,16 @@ app.post("/api/analyze", async (req, res) => {
 
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: [
-          { 
-            parts: [
-              { text: prompt },
-              { inlineData: { data: base64Data, mimeType } }
-            ]
-          }
-        ],
+        contents: {
+          parts: [
+            { text: prompt },
+            { inlineData: { data: base64Data, mimeType } }
+          ]
+        },
         config: {
           temperature: temperature,
           maxOutputTokens: (secConfig as any)?.maxTokens || 2048,
-        } as any
+        }
       });
 
       return res.json({ result: response.text });
@@ -227,7 +225,12 @@ async function bootstrap() {
       }
     }
     const dbId = firebaseConfig && firebaseConfig.firestoreDatabaseId;
-    db = getFirestore(undefined, dbId);
+    const defaultApp = admin.apps.length > 0 ? admin.apps[0] : undefined;
+    if (dbId) {
+      db = getFirestore(defaultApp, dbId);
+    } else {
+      db = getFirestore();
+    }
     console.log(`Firebase Firestore database initialized successfully for DB ID: ${dbId || "(default)"}`);
     
     // Proactively call getSecurityConfig to check and auto-seed the master API key and default admin settings on boot

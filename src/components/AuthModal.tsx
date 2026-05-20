@@ -59,6 +59,32 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   if (!isOpen) return null;
 
+  const enterSandboxMode = () => {
+    localStorage.setItem('local_auth_user', JSON.stringify({
+      uid: 'local_user_' + Math.random().toString(36).substr(2, 9),
+      email: email || 'local@uxlens.local',
+      displayName: fullName || 'Local Designer',
+      photoURL: '',
+      isAnonymous: false
+    }));
+    localStorage.setItem('local_user_profile', JSON.stringify({
+      fullName: fullName || 'Local Designer',
+      email: email || 'local@uxlens.local',
+      role: 'user',
+      createdAt: new Date().toISOString(),
+      languagePreference: 'en',
+      darkMode: true,
+      notifications: true
+    }));
+    
+    setSuccess("🔒 Local Sandbox Mode activated! Redirecting...");
+    setError(null);
+    window.dispatchEvent(new Event('local-login'));
+    setTimeout(() => {
+      onClose();
+    }, 1500);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -99,29 +125,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                            err.message?.includes('admin-restricted-operation');
 
       if (isConfigError) {
-        // Automatically start sandbox mode so they are in no way blocked
-        localStorage.setItem('local_auth_user', JSON.stringify({
-          uid: 'local_user_' + Math.random().toString(36).substr(2, 9),
-          email: email || 'local@uxlens.local',
-          displayName: fullName || 'Local Designer',
-          photoURL: '',
-          isAnonymous: false
-        }));
-        localStorage.setItem('local_user_profile', JSON.stringify({
-          fullName: fullName || 'Local Designer',
-          email: email || 'local@uxlens.local',
-          role: 'user',
-          createdAt: new Date().toISOString(),
-          languagePreference: 'en',
-          darkMode: true,
-          notifications: true
-        }));
-        
-        setSuccess("🔒 Firebase Auth configuration is missing. Starting local Sandbox Mode so you can use UXLens without account limits!");
-        window.dispatchEvent(new Event('local-login'));
-        setTimeout(() => {
-          onClose();
-        }, 2500);
+        enterSandboxMode();
         return;
       }
 
@@ -272,10 +276,33 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 flex items-start gap-2.5"
+              className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 flex flex-col gap-2.5"
             >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-              <span>{error}</span>
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500 font-bold" />
+                <span>{error}</span>
+              </div>
+              {String(error).includes("already") && (
+                <div className="flex items-center gap-2 pt-2 border-t border-red-500/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSignUp(false);
+                      setError(null);
+                    }}
+                    className="px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg hover:bg-neutral-800 transition-all font-bold text-[10px] text-white cursor-pointer"
+                  >
+                    Switch to Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enterSandboxMode}
+                    className="px-3 py-1.5 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/20 rounded-lg transition-all font-bold text-[10px] text-orange-400 cursor-pointer"
+                  >
+                    Instant Sandbox Mode
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
 
