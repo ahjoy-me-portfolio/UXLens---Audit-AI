@@ -33,7 +33,7 @@ export function Admin() {
   const [localConfig, setLocalConfig] = useState<AppConfig | null>(null);
   const [secConfig, setSecConfig] = useState<SecurityConfig>({
     geminiApiKey: '',
-    modelName: 'gemini-3-flash-preview',
+    modelName: 'gemini-3.5-flash',
     temperature: 0.4,
     maxTokens: 2048
   });
@@ -541,7 +541,7 @@ export function Admin() {
                       onChange={(e) => setSecConfig({...secConfig, modelName: e.target.value})}
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-red-600 text-sm"
                     >
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Recommend)</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash (Recommended)</option>
                       <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Heavy)</option>
                       <option value="gemini-flash-latest">Gemini Flash Latest</option>
                     </select>

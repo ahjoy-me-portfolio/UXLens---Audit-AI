@@ -37,14 +37,18 @@ export default function App() {
   const { profile } = useAuth();
 
   useEffect(() => {
+    let selectDark = true;
     if (profile) {
-      if (profile.darkMode === false) {
-        document.documentElement.classList.add('light');
-        document.documentElement.classList.remove('dark');
-      } else {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-      }
+      selectDark = profile.darkMode !== false;
+    } else {
+      selectDark = localStorage.getItem('darkMode') !== 'false';
+    }
+    if (selectDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
     }
   }, [profile?.darkMode]);
 

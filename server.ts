@@ -28,7 +28,7 @@ async function getSecurityConfig() {
         console.log("Auto-seeding default GEMINI_API_KEY from server environment into Firestore.");
         await docRef.set({
           geminiApiKey: process.env.GEMINI_API_KEY,
-          modelName: data?.modelName || 'gemini-3-flash-preview',
+          modelName: data?.modelName || 'gemini-3.5-flash',
           temperature: data?.temperature ?? 0.4,
           maxTokens: data?.maxTokens || 2048,
           adminPin: data?.adminPin || '1234'
@@ -43,7 +43,7 @@ async function getSecurityConfig() {
       console.log("Creating default security config in Firestore with master environment key.");
       const defaultSec = {
         geminiApiKey: process.env.GEMINI_API_KEY,
-        modelName: 'gemini-3-flash-preview',
+        modelName: 'gemini-3.5-flash',
         temperature: 0.4,
         maxTokens: 2048,
         adminPin: '1234'
@@ -81,7 +81,10 @@ app.post("/api/analyze", async (req, res) => {
         return res.status(500).json({ error: "GEMINI_API_KEY is missing. Please set it in AI Studio Secrets or Admin Security tab." });
       }
 
-      const modelName = (secConfig as any)?.modelName || "gemini-3-flash-preview";
+      let modelName = (secConfig as any)?.modelName || "gemini-3.5-flash";
+      if (modelName === "gemini-3-flash-preview" || modelName === "gemini-3-flash") {
+        modelName = "gemini-3.5-flash";
+      }
       const temperature = (secConfig as any)?.temperature ?? 0.4;
 
       const ai = new GoogleGenAI({ 

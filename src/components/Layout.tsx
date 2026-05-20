@@ -9,22 +9,71 @@ import {
   ShieldAlert, 
   Menu, 
   X,
-  History
+  History,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
-import { logout } from '../lib/firebase';
+import { db, logout } from '../lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { AuthModal, triggerAuthModal } from './AuthModal';
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, t } = useAuth();
+  const { user, profile, isAdmin, t } = useAuth();
   const { config } = useConfig();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const [logoTaps, setLogoTaps] = useState(0);
+  const [isDark, setIsDark] = useState(true);
+
+  // Sync theme with profile or localStorage
+  useEffect(() => {
+    let activeDark = true;
+    if (user && profile) {
+      activeDark = profile.darkMode !== false;
+    } else {
+      activeDark = localStorage.getItem('darkMode') !== 'false';
+    }
+    setIsDark(activeDark);
+    
+    // Apply styling class to html element
+    if (activeDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+  }, [user, profile?.darkMode]);
+
+  const toggleTheme = async () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+    
+    if (user && db) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          darkMode: nextDark
+        });
+      } catch (e) {
+        console.warn('Failed to save preference to Firestore:', e);
+      }
+    } else {
+      localStorage.setItem('darkMode', String(nextDark));
+    }
+  };
 
   useEffect(() => {
     const handleOpenAuth = () => setIsAuthOpen(true);
@@ -88,6 +137,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               )
             ))}
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all ml-1 mr-1 cursor-pointer"
+              aria-label="Toggle Theme"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDark ? <Sun className="w-5 h-5 text-yellow-500 animate-pulse" /> : <Moon className="w-5 h-5 text-neutral-400" />}
+            </button>
+
             {user ? (
               <button
                 onClick={handleLogout}
@@ -143,6 +202,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 )
               ))}
+              {/* Theme Toggle in Mobile Menu */}
+              <button
+                onClick={() => {
+                  toggleTheme();
+                  setIsMenuOpen(false);
+                }}
+                className="flex items-center justify-between p-4 rounded-2xl text-lg font-medium text-neutral-400 hover:bg-neutral-900 hover:text-white border border-transparent hover:border-neutral-800 transition-all cursor-pointer w-full text-left mt-2"
+              >
+                <span className="flex items-center gap-4">
+                  {isDark ? (
+                    <>
+                      <Sun className="w-6 h-6 text-yellow-500 animate-pulse" />
+                      Switch to Light Mode
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="w-6 h-6 text-neutral-400" />
+                      Switch to Dark Mode
+                    </>
+                  )}
+                </span>
+              </button>
+
               {user ? (
                 <button
                   onClick={() => {

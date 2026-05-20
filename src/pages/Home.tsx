@@ -76,13 +76,19 @@ export function Home() {
     try {
       // Determine backend URL dynamically based on environment (with support for WebView/APK environments)
       let apiEndpoint = '/api/analyze';
-      const isMobileApp = !window.location.origin.startsWith('http') || window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
-      if (isMobileApp && config?.serverUrl) {
-        const base = config.serverUrl.replace(/\/$/, "");
-        apiEndpoint = `${base}/api/analyze`;
-      } else if (isMobileApp) {
-        // Safe, emergency fallback to the sandbox production deployment endpoint
-        apiEndpoint = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+      const isWebView = !window.location.origin.startsWith('http');
+      const isLocalHost = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+
+      if (isWebView || isLocalHost) {
+        if (config?.serverUrl) {
+          const base = config.serverUrl.replace(/\/$/, "");
+          apiEndpoint = `${base}/api/analyze`;
+        } else if (isWebView) {
+          // Only use server fallback for non-web environments (apps, file://, etc.)
+          apiEndpoint = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+        } else {
+          apiEndpoint = '/api/analyze';
+        }
       }
 
       console.log(`Connecting to analysis endpoint: ${apiEndpoint}`);

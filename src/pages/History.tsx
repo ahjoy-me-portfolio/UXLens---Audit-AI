@@ -9,7 +9,10 @@ import {
   FileText,
   Loader2,
   Download,
-  Printer
+  Printer,
+  Lock,
+  LogIn,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -21,7 +24,7 @@ import { collection, query, where, orderBy, onSnapshot, doc, deleteDoc, updateDo
 import { AnalysisReport } from '../types';
 
 export function History() {
-  const { user, t } = useAuth();
+  const { user, loading: authLoading, t } = useAuth();
   const [reports, setReports] = useState<AnalysisReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -178,7 +181,11 @@ export function History() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const q = query(
       collection(db, 'reports'),
@@ -229,6 +236,54 @@ export function History() {
     if (typeof date?.toDate === 'function') return date.toDate().toLocaleDateString();
     return new Date(date).toLocaleDateString();
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-10 h-10 text-orange-600 animate-spin" />
+        <p className="text-neutral-500">Retrieving secure session...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto py-16 text-center space-y-8 px-4">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-10 space-y-8 relative overflow-hidden text-neutral-100"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="w-20 h-20 bg-neutral-950 rounded-3xl mx-auto flex items-center justify-center border border-neutral-800 shadow-xl relative">
+            <Lock className="w-8 h-8 text-orange-500" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-600 rounded-full flex items-center justify-center animate-pulse">
+              <span className="w-1.5 h-1.5 bg-white rounded-full" />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="text-2xl font-black text-white tracking-tight">History Vault is Locked</h2>
+            <p className="text-neutral-400 text-xs leading-relaxed">
+              Your UI/UX audit records are stored securely. To view past analyses, generate downloadable PDFs, or manage saved design audits, connect your account.
+            </p>
+            <p className="text-neutral-500 text-[11px] font-medium leading-relaxed italic bg-neutral-950/40 p-3 rounded-2xl border border-neutral-800/50 mt-2">
+              (অডিট হিস্ট্রি দেখতে, ডাউনলোড করতে এবং পিডিএফ রিপোর্ট জেনারেট করতে দয়া করে আপনার অ্যাকাউন্ট কানেক্ট বা সাইন ইন করুন।)
+            </p>
+          </div>
+
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal'))}
+            className="w-full h-14 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-orange-600/15 transition-all active:scale-95 group"
+          >
+            <LogIn className="w-4 h-4 text-white group-hover:translate-x-0.5 transition-transform" />
+            Connect Account Now
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

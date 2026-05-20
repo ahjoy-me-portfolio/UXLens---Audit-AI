@@ -45,8 +45,8 @@ export function useAuth() {
               // Seed if missing
               setDoc(userRef, {
                 fullName: u.displayName || 'Anonymous User',
-                email: u.email,
-                avatarUrl: u.photoURL,
+                email: u.email || '',
+                avatarUrl: u.photoURL || '',
                 role: 'user',
                 createdAt: serverTimestamp(),
                 languagePreference: 'en',

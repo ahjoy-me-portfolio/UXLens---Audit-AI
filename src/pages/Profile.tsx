@@ -18,7 +18,8 @@ import {
   Camera,
   Edit2,
   Check,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
@@ -107,11 +108,11 @@ export function Profile() {
       title: t('account_role'),
       icon: User,
       fields: [
-        { label: t('full_name'), value: profile.fullName, editable: true, key: 'fullName' },
-        { label: t('job_title'), value: profile.jobTitle || "Not set", editable: true, key: 'jobTitle' },
-        { label: t('bio'), value: profile.bio || "No bio yet", editable: true, key: 'bio' },
-        { label: t('email'), value: profile.email, editable: false },
-        { label: t('account_role'), value: profile.role, editable: false },
+        { label: t('full_name'), value: profile.fullName, editable: !user?.isAnonymous, key: 'fullName' },
+        { label: t('job_title'), value: profile.jobTitle || "Not set", editable: !user?.isAnonymous, key: 'jobTitle' },
+        { label: t('bio'), value: profile.bio || "No bio yet", editable: !user?.isAnonymous, key: 'bio' },
+        { label: t('email'), value: user?.isAnonymous ? "Temporary Guest" : profile.email, editable: false },
+        { label: t('account_role'), value: user?.isAnonymous ? "Guest" : profile.role, editable: false },
       ]
     },
     {
@@ -184,6 +185,33 @@ export function Profile() {
           )}
         </div>
       </div>
+
+      {user?.isAnonymous && (
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 rounded-[2rem] bg-orange-600/5 border-2 border-dashed border-orange-500/20 flex flex-col sm:flex-row items-center gap-6 justify-between text-neutral-100"
+        >
+          <div className="space-y-1 text-center sm:text-left">
+            <h4 className="text-sm font-black text-white flex items-center gap-2 justify-center sm:justify-start">
+              <Sparkles className="w-5 h-5 text-orange-500 shrink-0" />
+              Temporary Guest Session Enabled
+            </h4>
+            <p className="text-xs text-neutral-400">
+              You are signed in as a guest. To securely store your audits, histories, and custom settings permanently, upgrade to an account.
+            </p>
+            <p className="text-neutral-500 text-[10px] uppercase font-bold tracking-tight">
+              (অতিথি সেশনে আছেন। অডিট রিপোর্ট সুরক্ষিত রাখতে অনুগ্রহ করে ইমেল অ্যাকাউন্ট কানেক্ট করুন।)
+            </p>
+          </div>
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal'))}
+            className="h-10 px-5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-black rounded-xl shrink-0 transition-all active:scale-95 shadow-md hover:scale-105"
+          >
+            Create Permanent Account
+          </button>
+        </motion.div>
+      )}
 
       {/* Settings Grid */}
       <div className="grid md:grid-cols-2 gap-8">
