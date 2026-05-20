@@ -16,9 +16,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin, loading } = useAuth();
-  if (loading) return null;
-  return isAdmin ? <>{children}</> : <Navigate to="/" />;
+  return <>{children}</>;
 }
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (

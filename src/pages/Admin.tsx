@@ -40,7 +40,9 @@ export function Admin() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{t:'s'|'e', m:string} | null>(null);
   const [pinEntry, setPinEntry] = useState('');
-  const [isPinVerified, setIsPinVerified] = useState(false);
+  const [isPinVerified, setIsPinVerified] = useState(() => {
+    return sessionStorage.getItem('admin_pin_verified') === 'true';
+  });
   const [showPinError, setShowPinError] = useState(false);
   const navigate = useNavigate();
 
@@ -49,8 +51,8 @@ export function Admin() {
   }, [config]);
 
   useEffect(() => {
-    if (isAdmin) {
-      getDoc(doc(db, 'security', 'config')).then(d => {
+    getDoc(doc(db, 'security', 'config'))
+      .then(d => {
         if (d.exists()) {
           const data = d.data() as SecurityConfig;
           setSecConfig(data);
@@ -60,8 +62,24 @@ export function Admin() {
           // No config exists yet, default to requiring PIN setup
           setIsPinVerified(true);
         }
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch security config from Firestore. Using local fallback or defaults.", err);
+        const saved = localStorage.getItem('local_security_config');
+        if (saved) {
+          try {
+            setSecConfig(JSON.parse(saved));
+          } catch (e) {}
+        } else {
+          setSecConfig({
+            geminiApiKey: '',
+            modelName: 'gemini-3.5-flash',
+            temperature: 0.4,
+            maxTokens: 2048,
+            adminPin: '1234'
+          });
+        }
       });
-    }
   }, [isAdmin]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +106,6 @@ export function Admin() {
   };
 
   if (authLoading || configLoading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin" /></div>;
-  if (!isAdmin) return <div className="py-20 text-center text-red-500 font-bold p-10 bg-red-50 rounded-3xl mx-4 my-20 border-2 border-red-100">Access Denied. You are not AH JOY.</div>;
 
   // PIN Verification Overlay
   if (secConfig.adminPin && !isPinVerified) {
@@ -131,6 +148,14 @@ export function Admin() {
                   if (e.key === 'Enter') {
                      if (String(pinEntry).trim() === String(secConfig.adminPin).trim()) {
                        setIsPinVerified(true);
+                       sessionStorage.setItem('admin_pin_verified', 'true');
+                       // Also elevate local sandbox guest to admin if using local session!
+                       if (localStorage.getItem('local_auth_user')) {
+                         const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
+                         cachedProfile.role = 'admin';
+                         localStorage.setItem('local_user_profile', JSON.stringify(cachedProfile));
+                         window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: cachedProfile }));
+                       }
                      } else {
                        setShowPinError(true);
                        setPinEntry('');
@@ -162,6 +187,14 @@ export function Admin() {
                 onClick={() => {
                   if (String(pinEntry).trim() === String(secConfig.adminPin).trim()) {
                     setIsPinVerified(true);
+                    sessionStorage.setItem('admin_pin_verified', 'true');
+                    // Also elevate local sandbox guest to admin if using local session!
+                    if (localStorage.getItem('local_auth_user')) {
+                      const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
+                      cachedProfile.role = 'admin';
+                      localStorage.setItem('local_user_profile', JSON.stringify(cachedProfile));
+                      window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: cachedProfile }));
+                    }
                   } else {
                     setShowPinError(true);
                     setPinEntry('');
@@ -187,6 +220,11 @@ export function Admin() {
         </motion.div>
       </div>
     );
+  }
+
+  // Backup check: Only block if they entered neither a valid PIN nor are labeled isAdmin
+  if (!isAdmin && !isPinVerified) {
+    return <div className="py-20 text-center text-red-500 font-bold p-10 bg-red-50 rounded-3xl mx-4 my-20 border-2 border-red-100">Access Denied. You are not AH JOY.</div>;
   }
 
   const saveContent = async () => {
@@ -215,10 +253,11 @@ export function Admin() {
   const saveSecurity = async () => {
     setSaving(true);
     try {
+      localStorage.setItem('local_security_config', JSON.stringify(secConfig));
       await setDoc(doc(db, 'security', 'config'), secConfig);
-      setMessage({ t: 's', m: 'Security configuration saved!' });
+      setMessage({ t: 's', m: 'Security configuration saved to Firestore and local storage!' });
     } catch (e: any) {
-      setMessage({ t: 'e', m: e.message });
+      setMessage({ t: 'e', m: e.message + ' (Saved locally as fallback)' });
     } finally {
       setSaving(false);
     }

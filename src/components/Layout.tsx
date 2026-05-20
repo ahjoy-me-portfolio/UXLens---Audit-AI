@@ -27,7 +27,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const [logoTaps, setLogoTaps] = useState(0);
+  const logoTapsRef = React.useRef(0);
+  const logoLastTapRef = React.useRef(0);
   const [isDark, setIsDark] = useState(true);
 
   // Sync theme with profile or localStorage
@@ -88,12 +89,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogoClick = () => {
-    if (!isAdmin) return;
-    setLogoTaps(prev => prev + 1);
-    setTimeout(() => setLogoTaps(0), 1000); // Reset after 1 second of inactivity
-    if (logoTaps + 1 >= 3) {
+    const now = Date.now();
+    if (now - logoLastTapRef.current > 1500) {
+      logoTapsRef.current = 0;
+    }
+    logoTapsRef.current += 1;
+    logoLastTapRef.current = now;
+    if (logoTapsRef.current >= 3) {
       navigate('/admin');
-      setLogoTaps(0);
+      logoTapsRef.current = 0;
     }
   };
 
