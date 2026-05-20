@@ -53,7 +53,7 @@ export function History() {
       exportContainer.style.fontFeatureSettings = '"liga" 1, "clig" 1';
       
       const result = getParsedResult(report);
-      const rawContent = language === 'en' ? result.en : result.bn;
+      const rawContent = (language === 'en' ? result.en : result.bn) || result.en || '';
       
       // Clean up markdown for display
       const formattedContent = rawContent
@@ -169,7 +169,8 @@ export function History() {
         author: 'UXLens AI'
       });
       
-      pdf.save(`${report.imageName.replace(/\s+/g, '_')}_audit.pdf`);
+      const safeFileName = (report.imageName || 'Analysis').replace(/\s+/g, '_');
+      pdf.save(`${safeFileName}_audit.pdf`);
       
       document.body.removeChild(exportContainer);
     } catch (error) {
@@ -272,10 +273,16 @@ export function History() {
     r.designType?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getParsedResult = (r: AnalysisReport) => {
+  const getParsedResult = (r: AnalysisReport | null | undefined) => {
+    if (!r || !r.feedback) {
+      return { en: 'No analysis feedback available.', bn: 'কোনো বিশ্লেষণ উপলব্ধ নেই।' };
+    }
+    const parts = r.feedback.split('---BENGALI_VERSION---');
+    const enPart = (parts[0] || '').replace('---ENGLISH_VERSION---', '').trim();
+    const bnPart = parts[1] ? parts[1].trim() : enPart;
     return {
-      en: r.feedback.split('---BENGALI_VERSION---')[0].replace('---ENGLISH_VERSION---', '').trim(),
-      bn: r.feedback.split('---BENGALI_VERSION---')[1]?.trim()
+      en: enPart || 'No analysis feedback available.',
+      bn: bnPart || enPart || 'কোনো বিশ্লেষণ উপলব্ধ নেই।'
     };
   };
 

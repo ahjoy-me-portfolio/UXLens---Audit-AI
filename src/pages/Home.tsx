@@ -148,10 +148,15 @@ export function Home() {
     }
   };
 
-  const parsedResult = result ? {
-    en: result.split('---BENGALI_VERSION---')[0].replace('---ENGLISH_VERSION---', '').trim(),
-    bn: result.split('---BENGALI_VERSION---')[1]?.trim()
-  } : null;
+  const parsedResult = result ? (() => {
+    const parts = result.split('---BENGALI_VERSION---');
+    const enPart = (parts[0] || '').replace('---ENGLISH_VERSION---', '').trim();
+    const bnPart = parts[1] ? parts[1].trim() : enPart;
+    return {
+      en: enPart,
+      bn: bnPart
+    };
+  })() : null;
 
   return (
     <div className="space-y-12">

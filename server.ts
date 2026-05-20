@@ -108,44 +108,51 @@ app.post("/api/analyze", async (req, res) => {
   const { image, designType, goal } = req.body;
   if (!image) return res.status(400).json({ error: "Image required" });
 
-  let retries = 3;
+  let secConfig: any = null;
+  try {
+    secConfig = await getSecurityConfig();
+  } catch (secErr) {
+    console.warn("Failed to retrieve security configuration:", secErr);
+  }
+  
+  // Priority: Firestore Config (Admin custom) > Env Var (Developer built-in)
+  const apiKey = secConfig?.geminiApiKey || process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    return res.status(400).json({ 
+      error: "Gemini API key is not configured. Please log in to the Admin Panel, navigate to 'AI Model & Security', set your Master GEMINI API Key, and save settings."
+    });
+  }
+
+  let modelName = secConfig?.modelName || "gemini-3.5-flash";
+  if (modelName === "gemini-3-flash-preview" || modelName === "gemini-3-flash") {
+    modelName = "gemini-3.5-flash";
+  }
+  const temperature = secConfig?.temperature ?? 0.4;
+
+  const ai = new GoogleGenAI({ 
+    apiKey: apiKey,
+    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+  });
+
+  const base64Data = image.split(",")[1] || image;
+  const mimeType = image.split(";")[0]?.split(":")[1] || "image/png";
+
+  const prompt = `Analyze this UI/UX design:
+    Category: ${designType}
+    Goal: ${goal}
+    Markers: ---ENGLISH_VERSION--- and ---BENGALI_VERSION---
+    
+    Format your response with clear sections using the markers above.
+    English version first, then Bengali.`;
+
+  let attempts = 0;
+  const maxAttempts = 2; // Try up to 2 times (1 initial + 1 retry) for empty/transient errors
   const backoff = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  while (retries > 0) {
+  while (attempts < maxAttempts) {
+    attempts++;
     try {
-      const secConfig = await getSecurityConfig();
-      
-      // Priority: Firestore Config (Admin custom) > Env Var (Developer built-in)
-      const apiKey = (secConfig as any)?.geminiApiKey || process.env.GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        console.warn("GEMINI_API_KEY is missing. Returning high-fidelity sandbox fallback results.");
-        const sandboxFeedback = generateMockFeedback(designType, goal);
-        return res.json({ result: sandboxFeedback, isSandbox: true });
-      }
-
-      let modelName = (secConfig as any)?.modelName || "gemini-3.5-flash";
-      if (modelName === "gemini-3-flash-preview" || modelName === "gemini-3-flash") {
-        modelName = "gemini-3.5-flash";
-      }
-      const temperature = (secConfig as any)?.temperature ?? 0.4;
-
-      const ai = new GoogleGenAI({ 
-        apiKey: apiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
-
-      const base64Data = image.split(",")[1] || image;
-      const mimeType = image.split(";")[0]?.split(":")[1] || "image/png";
-
-      const prompt = `Analyze this UI/UX design:
-        Category: ${designType}
-        Goal: ${goal}
-        Markers: ---ENGLISH_VERSION--- and ---BENGALI_VERSION---
-        
-        Format your response with clear sections using the markers above.
-        English version first, then Bengali.`;
-
       const response = await ai.models.generateContent({
         model: modelName,
         contents: {
@@ -156,30 +163,40 @@ app.post("/api/analyze", async (req, res) => {
         },
         config: {
           temperature: temperature,
-          maxOutputTokens: (secConfig as any)?.maxTokens || 2048,
+          maxOutputTokens: secConfig?.maxTokens || 2048,
         }
       });
 
+      if (!response.text || response.text.trim() === "") {
+        console.warn(`Attempt ${attempts}/${maxAttempts}: Received an empty response from Gemini API.`);
+        if (attempts < maxAttempts) {
+          await backoff(1500);
+          continue;
+        }
+        return res.status(502).json({ 
+          error: "The AI model returned an empty response. This can occur due to safety filters or layout constraints. Please try uploading a different image or adjusting your prompt." 
+        });
+      }
+
       return res.json({ result: response.text });
     } catch (error: any) {
-      console.error(`AI Analysis Error (Retries left: ${retries - 1}):`, error);
-      
-      // Check for 503 UNAVAILABLE or 429 RATE_LIMIT
-      const isTransient = error.message?.includes('503') || 
-                        error.message?.includes('UNAVAILABLE') || 
-                        error.message?.includes('429') ||
-                        error.message?.includes('rate limit');
+      console.error(`AI Analysis Error (Attempt ${attempts}/${maxAttempts}):`, error);
 
-      if (isTransient && retries > 1) {
-        retries--;
-        await backoff(2000 * (3 - retries)); // Exponential backoff
+      const isTransient = error?.message?.includes('503') || 
+                        error?.message?.includes('UNAVAILABLE') || 
+                        error?.message?.includes('429') ||
+                        error?.message?.includes('rate limit');
+
+      if (isTransient && attempts < maxAttempts) {
+        await backoff(1500 * attempts);
         continue;
       }
-      
-      // If retries fail or an API error is unrecoverable, load high-fidelity sandbox audit report instead of crashing
-      console.warn("Retries failed or API hit non-recoverable error. Activating beautiful sandbox fallback audit results.");
-      const fallbackFeedback = generateMockFeedback(designType, goal);
-      return res.json({ result: fallbackFeedback, isSandbox: true });
+
+      // If we reach here, it's either a non-transient error or we have exhausted our attempts.
+      // Propagate the exact error message to the client as requested.
+      return res.status(500).json({ 
+        error: error?.message || "An unexpected error occurred during AI analysis." 
+      });
     }
   }
 });
