@@ -17,6 +17,7 @@ import {
   Upload,
   User,
   ExternalLink,
+  LogOut,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
@@ -40,9 +41,7 @@ export function Admin() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{t:'s'|'e', m:string} | null>(null);
   const [pinEntry, setPinEntry] = useState('');
-  const [isPinVerified, setIsPinVerified] = useState(() => {
-    return sessionStorage.getItem('admin_pin_verified') === 'true';
-  });
+  const [isPinVerified, setIsPinVerified] = useState(false);
   const [showPinError, setShowPinError] = useState(false);
   const navigate = useNavigate();
 
@@ -148,7 +147,6 @@ export function Admin() {
                   if (e.key === 'Enter') {
                      if (String(pinEntry).trim() === String(secConfig.adminPin).trim()) {
                        setIsPinVerified(true);
-                       sessionStorage.setItem('admin_pin_verified', 'true');
                        // Also elevate local sandbox guest to admin if using local session!
                        if (localStorage.getItem('local_auth_user')) {
                          const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
@@ -187,7 +185,6 @@ export function Admin() {
                 onClick={() => {
                   if (String(pinEntry).trim() === String(secConfig.adminPin).trim()) {
                     setIsPinVerified(true);
-                    sessionStorage.setItem('admin_pin_verified', 'true');
                     // Also elevate local sandbox guest to admin if using local session!
                     if (localStorage.getItem('local_auth_user')) {
                       const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
@@ -231,17 +228,7 @@ export function Admin() {
     if (!localConfig) return;
     setSaving(true);
     try {
-      const isCreatorSuperAdmin = user?.email?.toLowerCase() === 'ahjoy.me@gmail.com';
-      const finalConfig = { ...localConfig };
-      if (!isCreatorSuperAdmin) {
-        // Enforce fallback lock on creator profile database entries so other admins can't corrupt it
-        finalConfig.creator = {
-          name: "AH JOY",
-          portfolio: "https://ahjoy.framer.website/",
-          avatarUrl: "/input_file_2.png"
-        };
-      }
-      await setDoc(doc(db, 'appConfig', 'main'), finalConfig);
+      await setDoc(doc(db, 'appConfig', 'main'), localConfig);
       setMessage({ t: 's', m: 'Content updated successfully!' });
     } catch (e: any) {
       setMessage({ t: 'e', m: e.message });
@@ -294,6 +281,18 @@ export function Admin() {
            >
              <Key className="w-4 h-4" />
              Security
+           </button>
+           <button 
+             onClick={() => {
+               setIsPinVerified(false);
+               sessionStorage.removeItem('admin_pin_verified');
+               navigate('/');
+             }}
+             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap text-red-500 hover:text-red-400 hover:bg-neutral-800/80"
+             title="Exit and lock admin session"
+           >
+             <LogOut className="w-4 h-4" />
+             Exit Admin
            </button>
         </div>
       </div>
@@ -437,20 +436,14 @@ export function Admin() {
                    </div>
                    <h3 className="text-xl font-black text-white">Creator Profile (Personalize)</h3>
                 </div>
-                {user?.email?.toLowerCase() === 'ahjoy.me@gmail.com' ? (
-                  <span className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[10px] font-black uppercase">Owner access authorized</span>
-                ) : (
-                  <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase flex items-center gap-1">
-                    <Lock className="w-3 h-3" /> Immutable Profile
-                  </span>
-                )}
+                <span className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[10px] font-black uppercase flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Admin Edit Authorized
+                </span>
               </div>
               
-              {user?.email?.toLowerCase() !== 'ahjoy.me@gmail.com' && (
-                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 text-xs text-amber-400">
-                  This creator profile is pinned to the original creator (<strong>AH JOY</strong>). Only super admins can update creator information.
-                </div>
-              )}
+              <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 text-xs text-orange-400">
+                As an authenticated administrator, you have full override privileges to customize the creator profile, portfolio links, and photos.
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="space-y-6">
@@ -459,9 +452,8 @@ export function Admin() {
                     <input 
                       type="text" 
                       value={localConfig.creator?.name}
-                      disabled={user?.email?.toLowerCase() !== 'ahjoy.me@gmail.com'}
                       onChange={(e) => setLocalConfig({...localConfig, creator: {...localConfig.creator!, name: e.target.value}})}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white disabled:opacity-50"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white"
                     />
                   </div>
                   <div className="space-y-2">
@@ -470,9 +462,8 @@ export function Admin() {
                       <input 
                         type="text" 
                         value={localConfig.creator?.portfolio}
-                        disabled={user?.email?.toLowerCase() !== 'ahjoy.me@gmail.com'}
                         onChange={(e) => setLocalConfig({...localConfig, creator: {...localConfig.creator!, portfolio: e.target.value}})}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 pr-12 outline-none focus:ring-1 focus:ring-orange-600 text-white disabled:opacity-50"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 pr-12 outline-none focus:ring-1 focus:ring-orange-600 text-white"
                       />
                       <ExternalLink className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
                     </div>
@@ -486,11 +477,9 @@ export function Admin() {
                       {localConfig.creator?.avatarUrl ? (
                          <>
                            <img src={localConfig.creator.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
-                           {user?.email?.toLowerCase() === 'ahjoy.me@gmail.com' && (
-                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <ImageIcon className="w-8 h-8 text-white animate-bounce" />
-                             </div>
-                           )}
+                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <ImageIcon className="w-8 h-8 text-white animate-bounce" />
+                           </div>
                          </>
                       ) : (
                          <User className="w-12 h-12 text-neutral-700" />
@@ -498,18 +487,12 @@ export function Admin() {
                     </div>
                     
                     <div className="flex flex-col gap-2 w-full">
-                       {user?.email?.toLowerCase() === 'ahjoy.me@gmail.com' ? (
-                         <>
-                           <label className="w-full h-12 bg-neutral-800 hover:bg-neutral-700 text-white font-black rounded-xl flex items-center justify-center gap-3 cursor-pointer transition-all active:scale-95">
-                              <Upload className="w-4 h-4" />
-                              Upload from Device
-                              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                           </label>
-                           <p className="text-[10px] text-neutral-600 text-center">Image is stored securely in your private cloud config.</p>
-                         </>
-                       ) : (
-                         <p className="text-xs text-neutral-500 text-center py-2 font-bold bg-neutral-900 rounded-xl border border-neutral-800">Photo modification locked.</p>
-                       )}
+                       <label className="w-full h-12 bg-neutral-800 hover:bg-neutral-700 text-white font-black rounded-xl flex items-center justify-center gap-3 cursor-pointer transition-all active:scale-95">
+                          <Upload className="w-4 h-4" />
+                          Upload from Device
+                          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                       </label>
+                       <p className="text-[10px] text-neutral-600 text-center">Image is stored securely in your private cloud config.</p>
                     </div>
                   </div>
                 </div>
