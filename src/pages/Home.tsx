@@ -74,16 +74,18 @@ export function Home() {
     setResult(null);
 
     try {
-      // Determine backend URL dynamically based on environment (with support for WebView/APK environments)
+      // Determine backend URL dynamically based on environment (with support for WebView/APK environments and Netlify static hosting)
       let apiEndpoint = '/api/analyze';
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isCloudRun = window.location.hostname.includes('asia-east1.run.app') || window.location.hostname.includes('run.app');
       const isWebView = !window.location.origin.startsWith('http');
 
-      if (isWebView) {
+      if (isWebView || (!isLocalhost && !isCloudRun)) {
         if (config?.serverUrl) {
           const base = config.serverUrl.replace(/\/$/, "");
           apiEndpoint = `${base}/api/analyze`;
         } else {
-          // Only use server fallback for non-web environments (apps, file://, etc.)
+          // Use the Cloud Run live backend when hosted on static platforms like Netlify
           apiEndpoint = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
         }
       }
