@@ -142,6 +142,7 @@ export function Home() {
         }
       }
     } catch (err: any) {
+      console.error("Complete error during analysis:", err);
       setError(err.message);
     } finally {
       setAnalyzing(false);

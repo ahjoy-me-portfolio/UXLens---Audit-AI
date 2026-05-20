@@ -16,9 +16,67 @@ app.use(express.json({ limit: "50mb" }));
 
 let db: Firestore | null = null;
 
+// Eager/Lazy Firebase initializer to support serverless (Netlify Functions) execution reliably
+function initFirebase() {
+  if (db) return db;
+  try {
+    let firebaseConfig: any = null;
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    } else {
+      // Fallback details to make it 100% portable for Netlify / other cloud targets
+      firebaseConfig = {
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "graphic-antler-g3n78"
+      };
+    }
+    
+    // Initialize Firebase Admin
+    if (!admin.apps.length) {
+      const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (serviceAccountStr) {
+        try {
+          const serviceAccount = JSON.parse(serviceAccountStr);
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            projectId: firebaseConfig.projectId
+          });
+          console.log("Firebase Admin initialized via service account environment variable.");
+        } catch (e) {
+          console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable:", e);
+          admin.initializeApp({
+            projectId: firebaseConfig.projectId,
+          });
+        }
+      } else {
+        admin.initializeApp({
+          projectId: firebaseConfig.projectId,
+        });
+        console.log("Firebase Admin initialized via default ADC or project ID:", firebaseConfig.projectId);
+      }
+    }
+    const dbId = firebaseConfig && firebaseConfig.firestoreDatabaseId;
+    const defaultApp = admin.apps.length > 0 ? admin.apps[0] : undefined;
+    if (dbId) {
+      db = getFirestore(defaultApp, dbId);
+    } else {
+      db = getFirestore();
+    }
+    console.log(`Firebase Firestore database initialized successfully for DB ID: ${dbId || "(default)"}`);
+    return db;
+  } catch (err) {
+    console.error("Failed to eagerly initialize Firebase Admin:", err);
+    return null;
+  }
+}
+
 // Helper to get fresh security config (Admin SDK bypasses rules) and auto-seed if empty
 async function getSecurityConfig() {
-  if (!db) return null;
+  initFirebase();
+  if (!db) {
+    console.warn("Firestore instance is not available during getSecurityConfig.");
+    return null;
+  }
   try {
     const docRef = db.collection('security').doc('config');
     const d = await docRef.get();
@@ -29,7 +87,7 @@ async function getSecurityConfig() {
         console.log("Auto-seeding default GEMINI_API_KEY from server environment into Firestore.");
         await docRef.set({
           geminiApiKey: process.env.GEMINI_API_KEY,
-          modelName: data?.modelName || 'gemini-3.5-flash',
+          modelName: data?.modelName || 'gemini-2.5-flash',
           temperature: data?.temperature ?? 0.4,
           maxTokens: data?.maxTokens || 2048,
           adminPin: data?.adminPin || '1234'
@@ -44,7 +102,7 @@ async function getSecurityConfig() {
       console.log("Creating default security config in Firestore with master environment key.");
       const defaultSec = {
         geminiApiKey: process.env.GEMINI_API_KEY,
-        modelName: 'gemini-3.5-flash',
+        modelName: 'gemini-2.5-flash',
         temperature: 0.4,
         maxTokens: 2048,
         adminPin: '1234'
@@ -91,7 +149,7 @@ ${goal ? `*আপনার কাঙ্ক্ষিত লক্ষ্য অর
 
 ### ১. ভিজ্যুয়াল হায়ারার্কি এবং কম্পোজিশন (স্কোর: ৮.৬/১০)
 - **মূল বোতামটির (CTA) অবস্থান:** ডিজাইনের মূল বোতামটি যথেষ্ট দৃশ্যমান, তবে আর্দ্রতা বা ক্লিক সংখ্যা বাড়াতে এর প্যাডিং ১২% বৃদ্ধির সুপারিশ করা হচ্ছে।
-- **নেগেটিভ স্পেস এবং ব্যবধান:** কার্ডের চারপাশে ব্যবধান বা নেগেটিভ স্পেস অত্যন্ত নিখুঁত এবং নান্দনিকভাবে সাজানো।
+- **নেগেティブ স্পেস এবং ব্যবধান:** কার্ডের চারপাশে ব্যবধান বা নেগেটিভ স্পেস অত্যন্ত নিখুঁত এবং নান্দনিকভাবে সাজানো।
 
 ### ২. কনট্রাস্ট এবং গ্রিড সুসংগতি
 - **WCAG অনুপাত:** মূল শিরোনামের কনট্রাস্ট রেশিও আইডিয়াল সীমার কাছাকাছি। তবে সেকেন্ডারি লেখাগুলো একটু অস্পষ্ট মনে হতে পারে, এর উজ্জ্বলতা ১০% বাড়ানো প্রয়োজন।
@@ -115,19 +173,28 @@ app.post("/api/analyze", async (req, res) => {
     console.warn("Failed to retrieve security configuration:", secErr);
   }
   
-  // Priority: Firestore Config (Admin custom) > Env Var (Developer built-in)
-  const apiKey = secConfig?.geminiApiKey || process.env.GEMINI_API_KEY;
+  // Fallback API Key retrieval sequence
+  const apiKey = secConfig?.geminiApiKey || 
+                 secConfig?.masterApiKey || 
+                 secConfig?.apiKey || 
+                 process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
     return res.status(400).json({ 
-      error: "Gemini API key is not configured. Please log in to the Admin Panel, navigate to 'AI Model & Security', set your Master GEMINI API Key, and save settings."
+      error: "API key is not configured. Please add your Gemini API key in the Admin Panel."
     });
   }
 
-  let modelName = secConfig?.modelName || "gemini-3.5-flash";
-  if (modelName === "gemini-3-flash-preview" || modelName === "gemini-3-flash") {
-    modelName = "gemini-3.5-flash";
+  // Determine model name with fallbacks, ensuring deprecated ones are mapped correctly
+  let modelName = secConfig?.modelName || "gemini-2.5-flash";
+  if (!modelName || 
+      modelName.includes("gemini-1.5") || 
+      modelName === "gemini-pro" || 
+      modelName === "gemini-3-flash-preview" || 
+      modelName === "gemini-3-flash") {
+    modelName = "gemini-2.5-flash";
   }
+  
   const temperature = secConfig?.temperature ?? 0.4;
 
   const ai = new GoogleGenAI({ 
@@ -136,7 +203,10 @@ app.post("/api/analyze", async (req, res) => {
   });
 
   const base64Data = image.split(",")[1] || image;
-  const mimeType = image.split(";")[0]?.split(":")[1] || "image/png";
+  let mimeType = image.split(";")[0]?.split(":")[1] || "image/png";
+  if (!mimeType.startsWith("image/")) {
+    mimeType = "image/png";
+  }
 
   const prompt = `Analyze this UI/UX design:
     Category: ${designType}
@@ -153,14 +223,25 @@ app.post("/api/analyze", async (req, res) => {
   while (attempts < maxAttempts) {
     attempts++;
     try {
+      // Send the content using the specified Google Generative AI pattern
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: {
-          parts: [
-            { text: prompt },
-            { inlineData: { data: base64Data, mimeType } }
-          ]
-        },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data
+                }
+              },
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
         config: {
           temperature: temperature,
           maxOutputTokens: secConfig?.maxTokens || 2048,
@@ -174,7 +255,7 @@ app.post("/api/analyze", async (req, res) => {
           continue;
         }
         return res.status(502).json({ 
-          error: "The AI model returned an empty response. This can occur due to safety filters or layout constraints. Please try uploading a different image or adjusting your prompt." 
+          error: "AI returned an empty response." 
         });
       }
 
@@ -205,50 +286,8 @@ async function bootstrap() {
   console.log("Bootstrapping server...");
   
   try {
-    // Load Firebase Config
-    let firebaseConfig: any = null;
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    } else {
-      // Fallback details to make it 100% portable for Netlify / other cloud targets
-      firebaseConfig = {
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "graphic-antler-g3n78"
-      };
-    }
-    
-    // Initialize Firebase Admin
-    if (!admin.apps.length) {
-      const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-      if (serviceAccountStr) {
-        try {
-          const serviceAccount = JSON.parse(serviceAccountStr);
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            projectId: firebaseConfig.projectId
-          });
-          console.log("Firebase Admin initialized via service account environment variable.");
-        } catch (e) {
-          console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable:", e);
-          admin.initializeApp({
-            projectId: firebaseConfig.projectId,
-          });
-        }
-      } else {
-        admin.initializeApp({
-          projectId: firebaseConfig.projectId,
-        });
-        console.log("Firebase Admin initialized via default ADC or project ID:", firebaseConfig.projectId);
-      }
-    }
-    const dbId = firebaseConfig && firebaseConfig.firestoreDatabaseId;
-    const defaultApp = admin.apps.length > 0 ? admin.apps[0] : undefined;
-    if (dbId) {
-      db = getFirestore(defaultApp, dbId);
-    } else {
-      db = getFirestore();
-    }
-    console.log(`Firebase Firestore database initialized successfully for DB ID: ${dbId || "(default)"}`);
+    // Eagerly initialize Firebase
+    initFirebase();
     
     // Proactively call getSecurityConfig to check and auto-seed the master API key and default admin settings on boot
     setTimeout(async () => {
@@ -281,9 +320,14 @@ async function bootstrap() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
+  // Bypass express listen inside Serverless or Netlify functions environment
+  if (!process.env.NETLIFY) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server listening on http://0.0.0.0:${PORT}`);
+    });
+  } else {
+    console.log("Running in Netlify / Serverless production mode. Express listen bypassed.");
+  }
 }
 
 bootstrap();
