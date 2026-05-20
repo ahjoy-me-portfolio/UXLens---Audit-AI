@@ -80,13 +80,24 @@ export function Home() {
       const isCloudRun = window.location.hostname.includes('asia-east1.run.app') || window.location.hostname.includes('run.app');
       const isWebView = !window.location.origin.startsWith('http');
 
+      const cloudRunFallback = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+
       if (isWebView || (!isLocalhost && !isCloudRun)) {
-        if (config?.serverUrl) {
-          const base = config.serverUrl.replace(/\/$/, "");
-          apiEndpoint = `${base}/api/analyze`;
+        if (config?.serverUrl && config.serverUrl.trim() !== "") {
+          const base = config.serverUrl.trim().replace(/\/$/, "");
+          
+          // If the configured URL is a Netlify URL, or points directly to the current static site hostname,
+          // then Netlify is not actually hosting the Node.js backend server. So we bypass it and use the real Cloud Run fallback.
+          const isInvalidBackend = base.includes("netlify.app") || base.includes(window.location.hostname);
+          
+          if (isInvalidBackend) {
+            apiEndpoint = cloudRunFallback;
+          } else {
+            apiEndpoint = `${base}/api/analyze`;
+          }
         } else {
           // Use the Cloud Run live backend when hosted on static platforms like Netlify
-          apiEndpoint = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
+          apiEndpoint = cloudRunFallback;
         }
       }
 

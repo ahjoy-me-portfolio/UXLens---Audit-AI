@@ -352,12 +352,16 @@ export function Admin() {
                   <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest px-1">Backend Production Server URL (For APK/Mobile Compatibility)</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. https://uxlens-ai.netlify.app"
+                    placeholder="e.g. https://my-custom-backend.com (Leave blank for default)"
                     value={localConfig.serverUrl || ''}
                     onChange={(e) => setLocalConfig({...localConfig, serverUrl: e.target.value})}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 outline-none focus:ring-1 focus:ring-orange-600 text-white"
                   />
-                  <p className="text-xs text-neutral-500 px-1 mt-1">When running as a mobile APK, the app uses this backend URL to process screenshot audits. Standard web deployments will automatically detect this.</p>
+                  <p className="text-xs text-neutral-500 px-1 mt-1">
+                    When running on a static platform like <strong>Netlify</strong>, live web preview, or as a mobile APK, <strong>leave this field blank</strong>. 
+                    The app will automatically fall back and connect to your live Google Cloud Run backend server. 
+                    Only fill this in if you have deployed your own custom Node.js backend container.
+                  </p>
                 </div>
               </div>
             </div>
