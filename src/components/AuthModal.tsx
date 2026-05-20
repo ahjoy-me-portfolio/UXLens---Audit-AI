@@ -125,7 +125,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                            err.message?.includes('admin-restricted-operation');
 
       if (isConfigError) {
-        enterSandboxMode();
+        errMsg = "Email & Password login is disabled in your Firebase project. To enable it:\n\n" +
+                 "1. Go to Firebase Console -> Build -> Authentication -> Sign-in method.\n" +
+                 "2. Click 'Add new provider' and select 'Email/Password'.\n" +
+                 "3. Enable and save settings.\n\n" +
+                 "Or click 'Instant Sandbox Mode' below to bypass and test with local credentials.";
+        setError(errMsg);
         return;
       }
 
@@ -157,27 +162,13 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       console.error(err);
       const isConfigError = err.code === 'auth/operation-not-allowed' || err.message?.includes('operation-not-allowed');
       if (isConfigError) {
-        localStorage.setItem('local_auth_user', JSON.stringify({
-          uid: 'local_user_' + Math.random().toString(36).substr(2, 9),
-          email: 'google@uxlens.local',
-          displayName: 'Google Partner',
-          photoURL: '',
-          isAnonymous: false
-        }));
-        localStorage.setItem('local_user_profile', JSON.stringify({
-          fullName: 'Google Partner',
-          email: 'google@uxlens.local',
-          role: 'user',
-          createdAt: new Date().toISOString(),
-          languagePreference: 'en',
-          darkMode: true,
-          notifications: true
-        }));
-        setSuccess("Google Sign-In is not enabled on Firebase. Starting Local Sandbox session!");
-        window.dispatchEvent(new Event('local-login'));
-        setTimeout(() => {
-          onClose();
-        }, 2000);
+        setError(
+          "Google Sign-In is disabled in your Firebase project. To enable it:\n\n" +
+          "1. Go to Firebase Console -> Build -> Authentication -> Sign-in method.\n" +
+          "2. Click 'Add new provider' and select 'Google'.\n" +
+          "3. Enable Google, fill supporting fields, and save.\n\n" +
+          "Or click 'Instant Sandbox Mode' below to run in secure offline fallback mode."
+        );
         return;
       }
       setError(
@@ -280,20 +271,22 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             >
               <div className="flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500 font-bold" />
-                <span>{error}</span>
+                <span className="whitespace-pre-wrap leading-relaxed">{error}</span>
               </div>
-              {String(error).includes("already") && (
+              {(String(error).includes("already") || String(error).includes("disabled") || String(error).includes("enabled")) && (
                 <div className="flex items-center gap-2 pt-2 border-t border-red-500/10">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSignUp(false);
-                      setError(null);
-                    }}
-                    className="px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg hover:bg-neutral-800 transition-all font-bold text-[10px] text-white cursor-pointer"
-                  >
-                    Switch to Sign In
-                  </button>
+                  {String(error).includes("already") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSignUp(false);
+                        setError(null);
+                      }}
+                      className="px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg hover:bg-neutral-850 transition-all font-bold text-[10px] text-white cursor-pointer"
+                    >
+                      Switch to Sign In
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={enterSandboxMode}

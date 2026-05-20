@@ -104,6 +104,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { label: t('profile'), icon: User, path: '/profile', protected: true },
   ];
 
+  if (isAdmin) {
+    navItems.push({ label: 'Admin', icon: Settings, path: '/admin', protected: true });
+  }
+
   const handleLogout = async () => {
     if (user?.uid.startsWith('local_')) {
       localStorage.removeItem('local_auth_user');

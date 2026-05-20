@@ -20,7 +20,9 @@ export function useAuth() {
       if (savedUser) {
         setUser(JSON.parse(savedUser));
         if (savedProfile) {
-          setProfile(JSON.parse(savedProfile));
+          const parsed = JSON.parse(savedProfile);
+          setProfile(parsed);
+          setIsAdmin(parsed.role === 'admin');
         } else {
           setProfile({
             fullName: 'Guest Designer',
@@ -31,8 +33,8 @@ export function useAuth() {
             darkMode: true,
             notifications: true
           });
+          setIsAdmin(false);
         }
-        setIsAdmin(false);
         setLoading(false);
       } else {
         setUser(null);
@@ -50,6 +52,7 @@ export function useAuth() {
       const customEvent = e as CustomEvent;
       if (customEvent.detail) {
         setProfile(customEvent.detail);
+        setIsAdmin(customEvent.detail.role === 'admin');
       }
     };
     window.addEventListener('local-profile-updated', handleProfileUpdate);
@@ -91,7 +94,9 @@ export function useAuth() {
           const userRef = doc(db, 'users', u.uid);
           unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
-              setProfile(docSnap.data() as UserProfile);
+              const profileData = docSnap.data() as UserProfile;
+              setProfile(profileData);
+              setIsAdmin(isAdminUser || profileData.role === 'admin');
             } else {
               // Seed if missing
               setDoc(userRef, {
