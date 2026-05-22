@@ -116,7 +116,7 @@ export function Admin() {
         <div className="space-y-2">
           <h2 className="text-2xl font-black text-white font-sans uppercase tracking-tight">Access Denied</h2>
           <p className="text-neutral-500 text-xs font-medium font-sans leading-relaxed px-4">
-            You are not authorized to view the Control Center. Only the owner account (<span className="text-red-400 font-bold">ahjoy.me@gmail.com</span>) is granted administrative permissions.
+            You are not authorized to view the Control Center. Only authorized administrator accounts are granted permissions to access developer features.
           </p>
         </div>
         <button 

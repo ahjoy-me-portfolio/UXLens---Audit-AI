@@ -90,6 +90,18 @@ export function useAuth() {
           
           setIsAdmin(isAdminUser);
 
+          // Pre-populate with safe defaults to prevent UI rendering loading lockups while snapshot initializes
+          setProfile({
+            fullName: u.displayName || 'Anonymous User',
+            email: u.email || '',
+            avatarUrl: u.photoURL || '',
+            role: isAdminUser ? 'admin' : 'user',
+            createdAt: new Date().toISOString(),
+            languagePreference: 'en',
+            darkMode: true,
+            notifications: true
+          });
+
           // Setup profile Listener
           const userRef = doc(db, 'users', u.uid);
           unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
@@ -108,6 +120,8 @@ export function useAuth() {
                 languagePreference: 'en',
                 darkMode: true,
                 notifications: true
+              }).catch((e) => {
+                console.warn("Failed to automatically seed user profile document:", e);
               });
             }
           }, (err) => {
