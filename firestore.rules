@@ -56,16 +56,17 @@ service cloud.firestore {
       allow create: if isOwner(userId) &&
                       (
                         !('email' in incoming()) || 
-                        incoming().get('email', '') == "" || 
-                        incoming().get('email', '').lower() == request.auth.token.get('email', '').lower()
+                        incoming().email == null ||
+                        incoming().email == "" || 
+                        (
+                          'email' in request.auth.token &&
+                          request.auth.token.email != null &&
+                          incoming().email.lower() == request.auth.token.email.lower()
+                        )
                       ) &&
                       'fullName' in incoming() && incoming().fullName != null &&
                       'createdAt' in incoming() && incoming().createdAt != null;
       allow update: if isOwner(userId) &&
-                      (
-                        !('email' in incoming()) || 
-                        incoming().get('email', '').lower() == existing().get('email', '').lower()
-                      ) && // Email is immutable
                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'avatarUrl', 'bio', 'jobTitle', 'languagePreference', 'darkMode', 'notifications', 'updatedAt']);
       allow delete: if isAdmin();
     }
