@@ -106,6 +106,29 @@ export function Admin() {
 
   if (authLoading || configLoading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin" /></div>;
 
+  const isLocalSandbox = user?.uid?.startsWith('local_');
+
+  // Strict Security: Non-admins are completely blocked from even reaching the PIN gate.
+  if (!isAdmin && !isLocalSandbox) {
+    return (
+      <div className="py-20 text-center text-red-500 font-bold p-10 max-w-md mx-auto my-20 bg-neutral-900 border border-neutral-800 rounded-[2.5rem] space-y-6">
+        <ShieldAlert className="w-16 h-16 text-red-600 mx-auto" />
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white font-sans uppercase tracking-tight">Access Denied</h2>
+          <p className="text-neutral-500 text-xs font-medium font-sans leading-relaxed px-4">
+            You are not authorized to view the Control Center. Only the owner account (<span className="text-red-400 font-bold">ahjoy.me@gmail.com</span>) is granted administrative permissions.
+          </p>
+        </div>
+        <button 
+          onClick={() => navigate('/')} 
+          className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 hover:text-white transition-all text-neutral-300 font-bold text-sm rounded-2xl active:scale-95"
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   // PIN Verification Overlay
   if (secConfig.adminPin && !isPinVerified) {
     return (
