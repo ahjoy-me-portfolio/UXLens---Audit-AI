@@ -41,11 +41,6 @@ service cloud.firestore {
 
     // --- Rules ---
 
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Admins Collection: Used for RBAC
     // Normally should be locked down, but for initial setup we might need to seed it.
     // However, the agent instructions say to include the user email from runtime as an admin.

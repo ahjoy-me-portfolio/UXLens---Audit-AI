@@ -71,10 +71,16 @@ export function useConfig() {
           console.log('Seeding initial app config...');
           await setDoc(docRef, DEFAULT_CONFIG);
           setConfig(DEFAULT_CONFIG);
+        } else {
+          setConfig(d.data() as AppConfig);
         }
       } catch (e) {
         console.warn('Initial config fetch/seed failed (likely permission issue or network):', e);
+        setConfig(prev => prev || DEFAULT_CONFIG);
       }
+    }).catch((err) => {
+      console.warn('getDoc for appConfig failed (likely new database permission propagation delay):', err);
+      setConfig(prev => prev || DEFAULT_CONFIG);
     });
 
     return onSnapshot(docRef, (doc) => {
@@ -83,7 +89,8 @@ export function useConfig() {
       }
       setLoading(false);
     }, (err) => {
-      console.error('Config snapshot error:', err);
+      console.warn('Config snapshot status (using default offline-ready layout config):', err.message || err);
+      setConfig(prev => prev || DEFAULT_CONFIG);
       setLoading(false);
     });
   }, []);

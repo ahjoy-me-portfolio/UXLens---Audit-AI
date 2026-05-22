@@ -66,7 +66,8 @@ function initFirebase() {
         console.log("Firebase Admin initialized via default ADC or project ID:", firebaseConfig.projectId);
       }
     }
-    const dbId = firebaseConfig && firebaseConfig.firestoreDatabaseId;
+    const dbIdInput = firebaseConfig && firebaseConfig.firestoreDatabaseId;
+    const dbId = dbIdInput && dbIdInput !== "(default)" ? dbIdInput : undefined;
     const defaultApp = admin.apps.length > 0 ? admin.apps[0] : undefined;
     if (dbId) {
       db = getFirestore(defaultApp, dbId);
