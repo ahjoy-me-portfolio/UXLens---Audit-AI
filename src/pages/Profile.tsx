@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
-import { db, logout } from '../lib/firebase';
+import { db, logout, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { UserProfile } from '../types';
@@ -36,6 +36,7 @@ export function Profile() {
   const [saving, setSaving] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleLogout = async () => {
@@ -58,6 +59,7 @@ export function Profile() {
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) return;
     setSaving(true);
+    setError(null);
     try {
       if (user.uid.startsWith('local_')) {
         const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
@@ -76,6 +78,18 @@ export function Profile() {
       }
     } catch (err) {
       console.error(err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
+      if (!user.uid.startsWith('local_')) {
+        try {
+          handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+        } catch (wrappedErr) {
+          console.warn("Wrapped firestore error:", wrappedErr);
+        }
+      }
     } finally {
       setSaving(false);
       setEditingField(null);
@@ -157,6 +171,25 @@ export function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 pb-20">
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-red-500/10 border border-red-500/20 text-red-200 text-xs font-semibold rounded-2xl flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
+            <span>Update failed: {error}</span>
+          </div>
+          <button 
+            onClick={() => setError(null)}
+            className="p-1 hover:bg-white/5 rounded-lg text-red-400 hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </motion.div>
+      )}
+
       {/* Profile Header */}
       <div className="flex flex-col items-center text-center space-y-4">
         <div className="relative group">

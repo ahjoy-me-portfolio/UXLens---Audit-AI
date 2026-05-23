@@ -57,9 +57,7 @@ service cloud.firestore {
                       'fullName' in incoming() && incoming().fullName != null &&
                       'createdAt' in incoming() && incoming().createdAt != null;
       allow update: if isOwner(userId) &&
-                      (!('role' in incoming()) || incoming().role == existing().role) &&
-                      (!('email' in incoming()) || incoming().email == existing().email) &&
-                      (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt);
+                      !incoming().diff(existing()).affectedKeys().hasAny(['role', 'email', 'createdAt', 'subscriptionPlan']);
       allow delete: if isAdmin();
     }
 
