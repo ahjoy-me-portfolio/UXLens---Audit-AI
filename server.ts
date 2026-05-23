@@ -333,13 +333,13 @@ async function bootstrap() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  // Bypass express listen inside Serverless or Netlify functions environment
-  if (!process.env.NETLIFY) {
+  // Bypass express listen inside Serverless or Netlify/Vercel functions environment
+  if (!process.env.NETLIFY && !process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server listening on http://0.0.0.0:${PORT}`);
     });
   } else {
-    console.log("Running in Netlify / Serverless production mode. Express listen bypassed.");
+    console.log("Running in Netlify / Vercel / Serverless production mode. Express listen bypassed.");
   }
 }
 

@@ -74,32 +74,29 @@ export function Home() {
     setResult(null);
 
     try {
-      // Determine candidate backend URLs dynamically based on environment to support Netlify, static hosts, and mobile WebView/APKs
-      let endpoints: string[] = ['/api/analyze'];
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isCloudRun = window.location.hostname.includes('asia-east1.run.app') || window.location.hostname.includes('run.app');
+      // Determine candidate backend URLs dynamically based on environment to support Netlify, Vercel, static hosts, and mobile WebView/APKs
+      let endpoints: string[] = [];
       const isWebView = !window.location.origin.startsWith('http');
 
+      // Always favor same-origin relative endpoint for ANY web deployment (Vercel, Netlify, Cloud Run, Localhost, Custom Domains)
+      if (!isWebView) {
+        endpoints.push('/api/analyze');
+      }
+
+      if (config?.serverUrl && config.serverUrl.trim() !== "") {
+        const base = config.serverUrl.trim().replace(/\/$/, "");
+        const isInvalid = base.includes("netlify.app") || base.includes(window.location.hostname);
+        if (!isInvalid) {
+          endpoints.push(`${base}/api/analyze`);
+        }
+      }
+
+      // Add regional/cloud containers as stable fallback targets
       const devCloudRun = 'https://ais-dev-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
       const preCloudRun = 'https://ais-pre-jmrhyhvyturvrunupucp43-818821653045.asia-east1.run.app/api/analyze';
-
-      if (isWebView || (!isLocalhost && !isCloudRun)) {
-        // If we are on Netlify or an external static host, relative api path won't work, so we try Cloud Run containers
-        endpoints = [];
-        if (config?.serverUrl && config.serverUrl.trim() !== "") {
-          const base = config.serverUrl.trim().replace(/\/$/, "");
-          const isInvalid = base.includes("netlify.app") || base.includes(window.location.hostname);
-          if (!isInvalid) {
-            endpoints.push(`${base}/api/analyze`);
-          }
-        }
-        endpoints.push(devCloudRun);
-        endpoints.push(preCloudRun);
-      } else {
-        // On local or Cloud Run, relative endpoint is preferred, backed up by absolute URLs
-        endpoints.push(devCloudRun);
-        endpoints.push(preCloudRun);
-      }
+      
+      endpoints.push(devCloudRun);
+      endpoints.push(preCloudRun);
 
       console.log('Target endpoints to probe:', endpoints);
 
@@ -115,9 +112,16 @@ export function Home() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image, designType, goal }),
           });
+          
+          // If the endpoint physically does not exist (404), fall back to checking the next candidate
+          if (res.status === 404) {
+            console.warn(`Endpoint ${endpoint} returned 404. Trying fallback...`);
+            continue;
+          }
+          
           response = res;
           activeEndpointUsed = endpoint;
-          break; // Succeeded (did not throw network exception), so break loop
+          break; // Succeeded (valid routing endpoint found), break loop
         } catch (fetchErr: any) {
           console.warn(`Fetch attempt failed for ${endpoint}:`, fetchErr);
           lastError = fetchErr;
