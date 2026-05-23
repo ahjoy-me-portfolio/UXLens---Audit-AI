@@ -39,6 +39,18 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isValidUser(data) {
+      return data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             (!('avatarUrl' in data) || data.avatarUrl == null || (data.avatarUrl is string && data.avatarUrl.size() <= 500000)) &&
+             (!('role' in data) || data.role is string) &&
+             (!('languagePreference' in data) || data.languagePreference is string) &&
+             (!('darkMode' in data) || data.darkMode is bool) &&
+             (!('notifications' in data) || data.notifications is bool) &&
+             (!('bio' in data) || data.bio == null || (data.bio is string && data.bio.size() <= 500)) &&
+             (!('jobTitle' in data) || data.jobTitle == null || (data.jobTitle is string && data.jobTitle.size() <= 100));
+    }
+
     // --- Rules ---
 
     // Admins Collection: Used for RBAC
@@ -55,9 +67,21 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(userId) &&
                       'fullName' in incoming() && incoming().fullName != null &&
-                      'createdAt' in incoming() && incoming().createdAt != null;
+                      'createdAt' in incoming() && incoming().createdAt != null &&
+                      isValidUser(incoming());
       allow update: if isOwner(userId) &&
-                      !incoming().diff(existing()).affectedKeys().hasAny(['role', 'email', 'createdAt', 'subscriptionPlan']);
+                      // Ensure immutable or RBAC fields are not changed
+                      (!('role' in incoming()) || !('role' in existing()) || incoming().role == existing().role) &&
+                      (!('email' in incoming()) || !('email' in existing()) || incoming().email == existing().email) &&
+                      (!('createdAt' in incoming()) || !('createdAt' in existing()) || incoming().createdAt == existing().createdAt) &&
+                      (!('subscriptionPlan' in incoming()) || !('subscriptionPlan' in existing()) || incoming().subscriptionPlan == existing().subscriptionPlan) &&
+                      // Allow changes only to user-modifiable fields
+                      incoming().diff(existing()).affectedKeys().hasOnly([
+                        'fullName', 'avatarUrl', 'jobTitle', 'bio', 
+                        'darkMode', 'notifications', 'languagePreference', 'updatedAt',
+                        'role', 'email', 'createdAt', 'subscriptionPlan'
+                      ]) &&
+                      isValidUser(incoming());
       allow delete: if isAdmin();
     }
 
