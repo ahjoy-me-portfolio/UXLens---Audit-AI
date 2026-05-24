@@ -113,15 +113,15 @@ export function Home() {
             body: JSON.stringify({ image, designType, goal }),
           });
           
-          // If the endpoint physically does not exist (404), fall back to checking the next candidate
-          if (res.status === 404) {
-            console.warn(`Endpoint ${endpoint} returned 404. Trying fallback...`);
+          // If the endpoint returned a server error (5xx) or did not exist (404), try fallback candidates
+          if (res.status === 404 || res.status >= 500) {
+            console.warn(`Endpoint ${endpoint} returned status ${res.status}. Trying next fallback...`);
             continue;
           }
           
           response = res;
           activeEndpointUsed = endpoint;
-          break; // Succeeded (valid routing endpoint found), break loop
+          break; // Found a working candidate endpoint
         } catch (fetchErr: any) {
           console.warn(`Fetch attempt failed for ${endpoint}:`, fetchErr);
           lastError = fetchErr;
@@ -135,10 +135,23 @@ export function Home() {
         );
       }
 
-      const data = await response.json();
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        let rawText = "";
+        try {
+          rawText = await response.text();
+        } catch {}
+        console.error("Server response is not valid JSON:", rawText);
+        if (rawText && (rawText.includes("A server error") || rawText.includes("Internal Server Error") || rawText.includes("Error"))) {
+          throw new Error(`Server encountered an error (Status ${response.status}). Please try again.(${rawText.substring(0, 100)})`);
+        }
+        throw new Error(`Invalid response format from server (Status ${response.status}).`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || "Analysis failed");
+        throw new Error(data?.error || "Analysis failed");
       }
 
       setResult(data.result);
