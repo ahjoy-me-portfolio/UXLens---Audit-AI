@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
 import { db, logout, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Link } from 'react-router-dom';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { compressImage } from '../lib/image';
 
@@ -70,10 +70,21 @@ export function Profile() {
         window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: updated }));
         setProfile(prev => prev ? { ...prev, ...updates } : null);
       } else {
-        await updateDoc(doc(db, 'users', user.uid), {
+        // Warm local cache right away
+        if (updates.darkMode !== undefined) {
+          localStorage.setItem('darkMode', String(updates.darkMode));
+        }
+        if (updates.languagePreference !== undefined) {
+          localStorage.setItem('languagePreference', updates.languagePreference);
+        }
+        if (updates.notifications !== undefined) {
+          localStorage.setItem('notifications', String(updates.notifications));
+        }
+        
+        await setDoc(doc(db, 'users', user.uid), {
           ...updates,
           updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
         setProfile(prev => prev ? { ...prev, ...updates } : null);
       }
     } catch (err) {

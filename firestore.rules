@@ -66,12 +66,15 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId);
-      allow update: if (isOwner(userId) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly([
-                        'fullName', 'avatarUrl', 'jobTitle', 'bio', 
-                        'darkMode', 'notifications', 'languagePreference', 'updatedAt'
-                      ]) &&
-                      isValidUser(incoming())) || isAdmin();
+      allow update: if (
+        isOwner(userId) &&
+        incoming().role == existing().role &&
+        incoming().email == existing().email &&
+        (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt) &&
+        (!('subscriptionPlan' in incoming()) || ('subscriptionPlan' in existing() && incoming().subscriptionPlan == existing().subscriptionPlan)) &&
+        (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time) &&
+        isValidUser(incoming())
+      ) || isAdmin();
       allow delete: if isAdmin();
     }
 

@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { triggerAuthModal } from '../components/AuthModal';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { compressImage } from '../lib/image';
@@ -41,6 +41,7 @@ export function Home() {
   const [language, setLanguage] = useState<'en' | 'bn'>(
     (profile?.languagePreference as 'en' | 'bn') || 'en'
   );
+  const [isDragging, setIsDragging] = useState(false);
 
   React.useEffect(() => {
     if (profile?.languagePreference) {
@@ -50,21 +51,50 @@ export function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const processUploadedFile = (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) {
+      setError("File size too large (Max 12MB).");
+      return;
+    }
+    setError(null);
+    setResult(null);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const rawBase64 = reader.result as string;
+        // Pre-compress immediately to 1200x1200px at 0.8 quality. This reduces file size (typically to 100kb-200kb),
+        // guaranteeing zero payload-too-large errors and incredibly fast server uploads even on slow mobile connections.
+        const compressed = await compressImage(rawBase64, 1200, 1200, 0.8);
+        setImage(compressed);
+      } catch (compressErr) {
+        console.error("Client side compression failed, using original file:", compressErr);
+        setImage(reader.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError("File size too large (Max 5MB).");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-        setError(null);
-        setResult(null);
-      };
-      reader.readAsDataURL(file);
-    }
+    processUploadedFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    processUploadedFile(file);
   };
 
   const startAnalysis = async () => {
@@ -183,11 +213,15 @@ export function Home() {
             localStorage.setItem('local_reports', JSON.stringify(localSaved));
             console.log("Report saved to local storage successfully.");
           } else {
-            await addDoc(collection(db, 'reports'), {
-              ...newReport,
-              createdAt: serverTimestamp()
-            });
-            console.log("Report saved to Cloud Firestore successfully.");
+            try {
+              await addDoc(collection(db, 'reports'), {
+                ...newReport,
+                createdAt: serverTimestamp()
+              });
+              console.log("Report saved to Cloud Firestore successfully.");
+            } catch (fsErr) {
+              handleFirestoreError(fsErr, OperationType.CREATE, 'reports');
+            }
           }
         } catch (saveErr) {
           console.error("Failed to save report:", saveErr);
@@ -256,8 +290,15 @@ export function Home() {
           {/* Upload Area */}
           <div 
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             className={`relative aspect-video rounded-2xl border-2 border-dashed transition-all cursor-pointer group flex flex-col items-center justify-center gap-4 overflow-hidden ${
-              image ? 'border-orange-600' : 'border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/30'
+              isDragging 
+                ? 'border-orange-500 bg-orange-600/10 scale-[1.02]' 
+                : image 
+                  ? 'border-orange-600' 
+                  : 'border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/30'
             }`}
           >
             {image ? (

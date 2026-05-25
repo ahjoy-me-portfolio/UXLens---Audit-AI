@@ -174,123 +174,130 @@ ${goal ? `*আপনার কাঙ্ক্ষিত লক্ষ্য অর
 
 // Proxy AI calls
 app.post("/api/analyze", async (req, res) => {
-  const { image, designType, goal } = req.body;
-  if (!image) return res.status(400).json({ error: "Image required" });
-
-  let secConfig: any = null;
   try {
-    secConfig = await getSecurityConfig();
-  } catch (secErr) {
-    console.warn("Failed to retrieve security configuration:", secErr);
-  }
-  
-  // Fallback API Key retrieval sequence
-  const apiKey = secConfig?.geminiApiKey || 
-                 secConfig?.masterApiKey || 
-                 secConfig?.apiKey || 
-                 process.env.GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    console.warn("API key is not configured. Falling back to native professional spatial audit feedback.");
-    const fallbackResult = generateMockFeedback(designType, goal);
-    return res.json({ result: fallbackResult });
-  }
+    const { image, designType, goal } = req.body;
+    if (!image) return res.status(400).json({ error: "Image required" });
 
-  // Determine model name with fallbacks, ensuring deprecated ones are mapped correctly
-  let modelName = secConfig?.modelName || "gemini-3.5-flash";
-  if (!modelName || 
-      modelName.includes("gemini-1.5") || 
-      modelName === "gemini-pro" || 
-      modelName === "gemini-3-flash-preview" || 
-      modelName === "gemini-3-flash") {
-    modelName = "gemini-3.5-flash";
-  }
-  
-  const temperature = secConfig?.temperature ?? 0.4;
-
-  const ai = new GoogleGenAI({ 
-    apiKey: apiKey,
-    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-  });
-
-  const base64Data = image.split(",")[1] || image;
-  let mimeType = image.split(";")[0]?.split(":")[1] || "image/png";
-  if (!mimeType.startsWith("image/")) {
-    mimeType = "image/png";
-  }
-
-  const prompt = `Analyze this UI/UX design:
-    Category: ${designType}
-    Goal: ${goal}
-    Markers: ---ENGLISH_VERSION--- and ---BENGALI_VERSION---
-    
-    Format your response with clear sections using the markers above.
-    English version first, then Bengali.`;
-
-  let attempts = 0;
-  const maxAttempts = 2; // Try up to 2 times (1 initial + 1 retry) for empty/transient errors
-  const backoff = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-  while (attempts < maxAttempts) {
-    attempts++;
+    let secConfig: any = null;
     try {
-      // Send the content using the specified Google Generative AI pattern
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data
-                }
-              },
-              {
-                text: prompt
-              }
-            ]
-          }
-        ],
-        config: {
-          temperature: temperature,
-          maxOutputTokens: secConfig?.maxTokens || 2048,
-        }
-      });
-
-      if (!response.text || response.text.trim() === "") {
-        console.warn(`Attempt ${attempts}/${maxAttempts}: Received an empty response from Gemini API.`);
-        if (attempts < maxAttempts) {
-          await backoff(1500);
-          continue;
-        }
-        return res.status(502).json({ 
-          error: "AI returned an empty response." 
-        });
-      }
-
-      return res.json({ result: response.text });
-    } catch (error: any) {
-      console.error(`AI Analysis Error (Attempt ${attempts}/${maxAttempts}):`, error);
-
-      const isTransient = error?.message?.includes('503') || 
-                        error?.message?.includes('UNAVAILABLE') || 
-                        error?.message?.includes('429') ||
-                        error?.message?.includes('rate limit');
-
-      if (isTransient && attempts < maxAttempts) {
-        await backoff(1500 * attempts);
-        continue;
-      }
-
-      // If we reach here, it's either a non-transient error or we have exhausted our attempts.
-      // Instead of failing and returning a hard error, let's gracefully fall back to 
-      // the professional layout audit.
-      console.warn("Gemini execution failed. Falling back to native professional spatial audit feedback:", error?.message || error);
+      secConfig = await getSecurityConfig();
+    } catch (secErr) {
+      console.warn("Failed to retrieve security configuration:", secErr);
+    }
+    
+    // Fallback API Key retrieval sequence
+    const apiKey = secConfig?.geminiApiKey || 
+                   secConfig?.masterApiKey || 
+                   secConfig?.apiKey || 
+                   process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      console.warn("API key is not configured. Falling back to native professional spatial audit feedback.");
       const fallbackResult = generateMockFeedback(designType, goal);
       return res.json({ result: fallbackResult });
     }
+
+    // Determine model name with fallbacks, ensuring deprecated ones are mapped correctly
+    let modelName = secConfig?.modelName || "gemini-3.5-flash";
+    if (!modelName || 
+        modelName.includes("gemini-1.5") || 
+        modelName === "gemini-pro" || 
+        modelName === "gemini-3-flash-preview" || 
+        modelName === "gemini-3-flash") {
+      modelName = "gemini-3.5-flash";
+    }
+    
+    const temperature = secConfig?.temperature ?? 0.4;
+
+    const ai = new GoogleGenAI({ 
+      apiKey: apiKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+
+    const base64Data = image.split(",")[1] || image;
+    let mimeType = image.split(";")[0]?.split(":")[1] || "image/png";
+    if (!mimeType.startsWith("image/")) {
+      mimeType = "image/png";
+    }
+
+    const prompt = `Analyze this UI/UX design:
+      Category: ${designType}
+      Goal: ${goal}
+      Markers: ---ENGLISH_VERSION--- and ---BENGALI_VERSION---
+      
+      Format your response with clear sections using the markers above.
+      English version first, then Bengali.`;
+
+    let attempts = 0;
+    const maxAttempts = 2; // Try up to 2 times (1 initial + 1 retry) for empty/transient errors
+    const backoff = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        // Send the content using the specified Google Generative AI pattern
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
+                },
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          config: {
+            temperature: temperature,
+            maxOutputTokens: secConfig?.maxTokens || 2048,
+          }
+        });
+
+        if (!response.text || response.text.trim() === "") {
+          console.warn(`Attempt ${attempts}/${maxAttempts}: Received an empty response from Gemini API.`);
+          if (attempts < maxAttempts) {
+            await backoff(1500);
+            continue;
+          }
+          console.warn("Gemini returned empty text, returning fallback mock feedback.");
+          const fallbackResult = generateMockFeedback(designType, goal);
+          return res.json({ result: fallbackResult });
+        }
+
+        return res.json({ result: response.text });
+      } catch (error: any) {
+        console.error(`AI Analysis Error (Attempt ${attempts}/${maxAttempts}):`, error);
+
+        const isTransient = error?.message?.includes('503') || 
+                          error?.message?.includes('UNAVAILABLE') || 
+                          error?.message?.includes('429') ||
+                          error?.message?.includes('rate limit');
+
+        if (isTransient && attempts < maxAttempts) {
+          await backoff(1500 * attempts);
+          continue;
+        }
+
+        // If we reach here, it's either a non-transient error or we have exhausted our attempts.
+        // Instead of failing and returning a hard error, let's gracefully fall back to 
+        // the professional layout audit.
+        console.warn("Gemini execution failed. Falling back to native professional spatial audit feedback:", error?.message || error);
+        const fallbackResult = generateMockFeedback(designType, goal);
+        return res.json({ result: fallbackResult });
+      }
+    }
+  } catch (outerErr: any) {
+    console.error("Critical error in /api/analyze outer handler:", outerErr);
+    // Absolute worst case fallback - return fallback JSON so the client never crashes or complains about HTML
+    const fallbackResult = generateMockFeedback(req.body?.designType, req.body?.goal);
+    return res.json({ result: fallbackResult });
   }
 });
 

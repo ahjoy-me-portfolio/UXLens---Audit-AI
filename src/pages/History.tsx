@@ -19,7 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useAuth } from '../hooks/useAuth';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { AnalysisReport } from '../types';
 
@@ -244,8 +244,12 @@ export function History() {
       }
       return;
     }
-    const docRef = doc(db, 'reports', report.id);
-    await updateDoc(docRef, { isFavorite: !report.isFavorite });
+    try {
+      const docRef = doc(db, 'reports', report.id);
+      await updateDoc(docRef, { isFavorite: !report.isFavorite });
+    } catch (fsErr) {
+      handleFirestoreError(fsErr, OperationType.UPDATE, `reports/${report.id}`);
+    }
   };
 
   const deleteReport = async (e: React.MouseEvent, id: string) => {
@@ -263,8 +267,12 @@ export function History() {
         }
         return;
       }
-      await deleteDoc(doc(db, 'reports', id));
-      if (selectedReport?.id === id) setSelectedReport(null);
+      try {
+        await deleteDoc(doc(db, 'reports', id));
+        if (selectedReport?.id === id) setSelectedReport(null);
+      } catch (fsErr) {
+        handleFirestoreError(fsErr, OperationType.DELETE, `reports/${id}`);
+      }
     }
   };
 

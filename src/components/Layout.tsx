@@ -63,6 +63,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.remove('dark');
     }
     
+    // Always persist to localStorage immediately
+    localStorage.setItem('darkMode', String(nextDark));
+    
     if (user && db && !user.uid.startsWith('local_')) {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
@@ -71,14 +74,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn('Failed to save preference to Firestore:', e);
       }
-    } else {
-      localStorage.setItem('darkMode', String(nextDark));
-      if (user?.uid.startsWith('local_')) {
-        const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
-        const updated = { ...cachedProfile, darkMode: nextDark };
-        localStorage.setItem('local_user_profile', JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: updated }));
-      }
+    } else if (user?.uid.startsWith('local_')) {
+      const cachedProfile = JSON.parse(localStorage.getItem('local_user_profile') || '{}');
+      const updated = { ...cachedProfile, darkMode: nextDark };
+      localStorage.setItem('local_user_profile', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('local-profile-updated', { detail: updated }));
     }
   };
 

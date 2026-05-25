@@ -97,9 +97,9 @@ export function useAuth() {
             avatarUrl: u.photoURL || '',
             role: isAdminUser ? 'admin' : 'user',
             createdAt: new Date().toISOString(),
-            languagePreference: 'en',
-            darkMode: true,
-            notifications: true
+            languagePreference: localStorage.getItem('languagePreference') || 'en',
+            darkMode: localStorage.getItem('darkMode') !== 'false',
+            notifications: localStorage.getItem('notifications') !== 'false'
           });
 
           // Setup profile Listener
@@ -109,6 +109,14 @@ export function useAuth() {
               const profileData = docSnap.data() as UserProfile;
               setProfile(profileData);
               setIsAdmin(isAdminUser || profileData.role === 'admin');
+              
+              // Warm local cache so refreshes are smooth
+              if (profileData.darkMode !== undefined) {
+                localStorage.setItem('darkMode', String(profileData.darkMode));
+              }
+              if (profileData.languagePreference !== undefined) {
+                localStorage.setItem('languagePreference', profileData.languagePreference);
+              }
             } else {
               // Seed if missing
               setDoc(userRef, {
@@ -117,9 +125,9 @@ export function useAuth() {
                 avatarUrl: u.photoURL || '',
                 role: 'user',
                 createdAt: serverTimestamp(),
-                languagePreference: 'en',
-                darkMode: true,
-                notifications: true
+                languagePreference: localStorage.getItem('languagePreference') || 'en',
+                darkMode: localStorage.getItem('darkMode') !== 'false',
+                notifications: localStorage.getItem('notifications') !== 'false'
               }).catch((e) => {
                 console.warn("Failed to automatically seed user profile document:", e);
               });
